@@ -1,5 +1,9 @@
 /**
  * Server-only Tavily web search — same contract as ``mcp/tavily-web-search`` / ``adk/tools/tavily_search.py``.
+ *
+ * Tavily Search API: POST https://api.tavily.com/search — Bearer ``TAVILY_API_KEY``,
+ * body: ``query``, ``search_depth``, ``max_results``; optional ``include_answer`` for an LLM-style summary.
+ * @see https://docs.tavily.com/documentation/api-reference/endpoint/search
  */
 import type { ScenarioKind } from "@/lib/constants";
 import type { ActiveShipment } from "@/lib/shipments";
@@ -31,6 +35,101 @@ export type TavilyWeatherNewsErr = {
 };
 
 export type TavilyWeatherNewsPayload = TavilyWeatherNewsOk | TavilyWeatherNewsErr;
+
+type TavilySearchOptions = {
+  maxResults?: number;
+  searchDepth?: "basic" | "advanced";
+  /** When true, Tavily may return an ``answer`` field summarizing results. */
+  includeAnswer?: boolean;
+};
+
+/**
+ * Run a raw Tavily search (any query). Used by the disaster chatbot and other callers.
+ */
+export async function fetchTavilySearchQuery(
+  query: string,
+  options?: TavilySearchOptions,
+): Promise<TavilyWeatherNewsPayload> {
+  const key = tavilyApiKey();
+  const q = query.trim();
+  if (!q) {
+    return { ok: false, error: "Empty search query" };
+  }
+  if (!key) {
+    return { ok: false, error: "TAVILY_API_KEY is not set", query: q };
+  }
+
+  const maxResults = Math.min(15, Math.max(1, options?.maxResults ?? 8));
+  const searchDepth = options?.searchDepth ?? "advanced";
+  const includeAnswer = options?.includeAnswer ?? true;
+
+  try {
+    const res = await fetch(TAVILY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({
+        query: q,
+        search_depth: searchDepth,
+        max_results: maxResults,
+        include_answer: includeAnswer,
+      }),
+      cache: "no-store",
+    });
+
+    const raw = await res.text();
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: `Tavily HTTP ${res.status}: ${raw.slice(0, 280)}`,
+        query: q,
+      };
+    }
+
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return { ok: false, error: "Invalid JSON from Tavily", query: q };
+    }
+
+    const answer =
+      typeof data.answer === "string" && data.answer.trim()
+        ? data.answer.trim()
+        : null;
+
+    const rawResults = data.results;
+    const results: TavilyResultItem[] = [];
+    if (Array.isArray(rawResults)) {
+      for (const item of rawResults) {
+        if (!item || typeof item !== "object") continue;
+        const o = item as Record<string, unknown>;
+        const title = typeof o.title === "string" ? o.title : "";
+        const url = typeof o.url === "string" ? o.url : "";
+        const content =
+          typeof o.content === "string"
+            ? o.content
+            : typeof o.raw_content === "string"
+              ? o.raw_content
+              : "";
+        if (title || url || content) {
+          results.push({
+            title: title || url || "Result",
+            url: url || "#",
+            content: content.slice(0, 2000),
+          });
+        }
+      }
+    }
+
+    return { ok: true, query: q, answer, results };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Tavily request failed";
+    return { ok: false, error: msg, query: q };
+  }
+}
 
 /** Build a lane- and scenario-aware query for public weather / freight headlines. */
 export function buildWeatherNewsTavilyQuery(
@@ -77,78 +176,41 @@ export async function fetchTavilyWeatherNews(
   ship: ActiveShipment | null,
   options?: { maxResults?: number; searchDepth?: "basic" | "advanced" },
 ): Promise<TavilyWeatherNewsPayload> {
-  const key = tavilyApiKey();
   const query = buildWeatherNewsTavilyQuery(scenario, ship);
-  if (!key) {
-    return { ok: false, error: "TAVILY_API_KEY is not set", query };
+  return fetchTavilySearchQuery(query, {
+    maxResults: options?.maxResults ?? 8,
+    searchDepth: options?.searchDepth ?? "advanced",
+    includeAnswer: true,
+  });
+}
+
+/**
+ * Build a Tavily query for disaster / emergency-management context (War Room chatbot).
+ * Grounds search in scenario and lane when available.
+ */
+export function buildDisasterManagementTavilyQuery(
+  userMessage: string,
+  scenario: ScenarioKind | undefined,
+  ship: ActiveShipment | null,
+): string {
+  const user = userMessage.trim().slice(0, 500);
+  const scen =
+    scenario === "blizzard"
+      ? "winter storm blizzard interstate road emergency"
+      : scenario === "port_strike"
+        ? "port strike maritime supply chain freight disruption"
+        : "disaster management emergency operations continuity";
+  const geoParts = [
+    ship?.state?.trim(),
+    ship?.routeFrom?.trim(),
+    ship?.routeTo?.trim(),
+  ].filter(Boolean);
+  const geo = geoParts.length ? geoParts.join(" ") : "United States";
+
+  const core =
+    "latest disaster management emergency preparedness ICS NIMS freight trucking logistics";
+  if (user) {
+    return `${core} ${scen} ${geo} — user question: ${user}`.replace(/\s+/g, " ").trim();
   }
-
-  const maxResults = Math.min(12, Math.max(1, options?.maxResults ?? 8));
-  const searchDepth = options?.searchDepth ?? "advanced";
-
-  try {
-    const res = await fetch(TAVILY_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${key}`,
-      },
-      body: JSON.stringify({
-        query,
-        search_depth: searchDepth,
-        max_results: maxResults,
-      }),
-      cache: "no-store",
-    });
-
-    const raw = await res.text();
-    if (!res.ok) {
-      return {
-        ok: false,
-        error: `Tavily HTTP ${res.status}: ${raw.slice(0, 280)}`,
-        query,
-      };
-    }
-
-    let data: Record<string, unknown>;
-    try {
-      data = JSON.parse(raw) as Record<string, unknown>;
-    } catch {
-      return { ok: false, error: "Invalid JSON from Tavily", query };
-    }
-
-    const answer =
-      typeof data.answer === "string" && data.answer.trim()
-        ? data.answer.trim()
-        : null;
-
-    const rawResults = data.results;
-    const results: TavilyResultItem[] = [];
-    if (Array.isArray(rawResults)) {
-      for (const item of rawResults) {
-        if (!item || typeof item !== "object") continue;
-        const o = item as Record<string, unknown>;
-        const title = typeof o.title === "string" ? o.title : "";
-        const url = typeof o.url === "string" ? o.url : "";
-        const content =
-          typeof o.content === "string"
-            ? o.content
-            : typeof o.raw_content === "string"
-              ? o.raw_content
-              : "";
-        if (title || url || content) {
-          results.push({
-            title: title || url || "Result",
-            url: url || "#",
-            content: content.slice(0, 2000),
-          });
-        }
-      }
-    }
-
-    return { ok: true, query, answer, results };
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Tavily request failed";
-    return { ok: false, error: msg, query };
-  }
+  return `${core} ${scen} ${geo} news advisories`.replace(/\s+/g, " ").trim();
 }

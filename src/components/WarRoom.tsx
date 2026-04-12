@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { DisasterTavilyChatbot } from "./DisasterTavilyChatbot";
 import { CompanyProfileModal } from "./CompanyProfileModal";
 import { WarRoomSidebar } from "./WarRoomSidebar";
 import { MainWorkspace } from "./MainWorkspace";
@@ -209,6 +210,10 @@ export default function WarRoom() {
         onSaved={() => {
           void refreshProfile();
         }}
+      />
+      <DisasterTavilyChatbot
+        scenario={scenario}
+        shipmentId={selectedShipmentId}
       />
     </div>
   );

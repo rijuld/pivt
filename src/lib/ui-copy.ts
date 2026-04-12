@@ -313,3 +313,19 @@ export const routesIntel = {
   title: "Suggested routes",
   riskPrefix: "Summary — ",
 } as const;
+
+/** Bottom-right disaster intel chat (Tavily Search API — not watsonx Orchestrate). */
+export const disasterChat = {
+  title: "Disaster intel",
+  subtitle: "Live web search via Tavily",
+  fabAria: "Open disaster information chat",
+  closeAria: "Close disaster information chat",
+  placeholder: "Ask about advisories, continuity, corridors…",
+  send: "Send",
+  thinking: "Searching…",
+  introAssistant:
+    "Ask anything about current disaster management, emergency operations, or freight continuity. Answers use **Tavily** web search from this app. Verify critical facts with official sources.",
+  noApiKey:
+    "Tavily is not configured. Add **TAVILY_API_KEY** to `.env.local` and restart the dev server.",
+  sourcesHeading: "Sources",
+} as const;
