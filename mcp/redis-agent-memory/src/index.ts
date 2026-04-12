@@ -13,8 +13,8 @@ const AGENT_IDS = [
   "routing_pivt",
   "facility_pivt",
   "optimizing_pivt",
-  "cost_pivt",
   "driver_pivt",
+  "disaster_management_pivt",
   "eis_orchestrator",
 ] as const;
 

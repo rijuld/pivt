@@ -14,7 +14,7 @@ import {
   POINT_EVENT_BUFFER_KM,
   intersectRoutesWithAlertFeatures,
 } from "@/lib/weather-route-intersection";
-import { listShips } from "@/lib/db/ships-db";
+import { listShips, saveWeatherEventsSnapshot } from "@/lib/db/ships-db";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -58,7 +58,7 @@ export async function GET() {
 
     const usMapDisplay = buildUsMapDisplay(mapPoints, routesFiltered);
 
-    return NextResponse.json({
+    const body = {
       fetchedAt: new Date().toISOString(),
       totalAlerts: totalFeatures,
       fleetRouteCount: ships.length,
@@ -66,7 +66,14 @@ export async function GET() {
       pointBufferKm: POINT_EVENT_BUFFER_KM,
       usMapDisplay,
       hits,
-    });
+    };
+    try {
+      saveWeatherEventsSnapshot(JSON.stringify(body));
+    } catch (e) {
+      console.error("weather snapshot save", e);
+    }
+
+    return NextResponse.json(body);
   } catch (e) {
     console.error(e);
     return NextResponse.json(

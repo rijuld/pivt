@@ -1,0 +1,475 @@
+Mapping inputs and outputs
+You can manually map the inputs and outputs of your nodes using the map_input() and map_output() methods. To do this, call map_input() or map_output() in your node and provide the following values:
+Show `map_input()` Parameters
+
+Show `map_output()` Parameters
+
+The following example shows how to use map_input() and map_output() to map values for a node:
+Python
+'''
+Build a simple hello world agentic workflow that will combine the result of two tools.
+'''
+
+from pydantic import BaseModel
+from ibm_watsonx_orchestrate.flow_builder.flows import END, Flow, flow, START
+
+from .get_hello_message import get_hello_message
+from .combine_names import combine_names
+
+class Name(BaseModel):
+    """
+    This class represents a person's name.
+
+    Attributes:
+        first_name (str): The person's first name.
+        last_name (str): The person's last name.
+    """
+    first_name: str
+    last_name: str
+
+class Message(BaseModel):
+    msg: str
+
+@flow(
+        name = "hello_message_flow",
+        input_schema=Name,
+        output_schema=Message
+    )
+def build_hello_message_flow_datamap(aflow: Flow = None) -> Flow:
+    """
+    Creates an agentic workflow with two tools: get_hello_message and combine_names.
+    Args:
+        flow (Flow, optional): The agentic workflow to be built. Defaults to None.
+    Returns:
+        Flow: The created agentic workflow.
+    """
+    combine_names_node = aflow.tool(combine_names)
+    combine_names_node.map_input(input_variable="first_name", expression="flow.input.first_name")
+    combine_names_node.map_input(input_variable="last_name", expression="flow.input.last_name", default_value="default_last_name")
+
+    get_hello_message_node = aflow.tool(get_hello_message, output_schema=Message)
+
+    aflow.edge(START, combine_names_node).edge(combine_names_node, get_hello_message_node).edge(get_hello_message_node, END)
+
+flow.map_output(
+    output_variable="Type_Justification",
+    expression="flow.Type_Classifier_Node.output.justification_text if flow.Classifier_Node.output.justification_text else \"N/A\"")
+             
+    return aflow
+See all 50 lines
+Nodes use schemas to define the structure of incoming and outgoing data, ensuring consistent validation and predictable behavior. The following parameters describe how schemas and mapping functions control the flow of data through a node.
+Show Schema definitions and data mapping Parameters
+
+The following example shows how a node applies its schema definitions and mapping parameters to process inputs and generate a structured, validated output.
+Python
+
+class GEN_AI_NODE(BaseModel):
+    description_original: str = Field(description="Formatted description ....", default="")
+
+class JUSTIFICATION_TYPE_RESULT(BaseModel):
+    grievance_type_llm: str = Field(description="Type of thing", default="")
+    justification_text: str = Field(description="Justification for classified type", default="")
+
+classifier_node = flow.prompt(
+      name="Classifier_Node",
+      display_name="Classifier_Node",
+      description="Type Classifier",
+      ...
+      input_schema=GEN_AI_NODE,
+      output_schema=JUSTIFICATION_TYPE_RESULT)
+
+classifier_node.map_input(input_variable="description_original", expression="flow.Load_Extracted_Data_Node.output.extracted_kvps.Description_Original")
+See all 17 lines
+Testing agentic workflow
+After importing an agentic workflow tool, you can test it using a main Python script before add it to an agent. The following steps guide you through testing a flow, including defining, compiling, and running the flow:
+1
+Create a test script
+
+Agentic workflow are asynchronous, and so are the functions used to run them.
+Start by creating a script that defines a function to invoke your agentic workflow. In the example below, the script hello_message_flow.py contains a function build_hello_message_flow, decorated with @flow, which returns the Flow object you want to test.
+Python
+import asyncio
+
+from .hello_message_flow import build_hello_message_flow
+
+async def main():
+
+    my_flow_definition = build_hello_message_flow()
+
+if __name__ == "__main__":
+    asyncio.run(main())  
+See all 10 lines
+2
+Compile the agentic workflow
+
+Next, compile the agentic workflow. This step generates the agentic workflow model and deploys it to the engine. It returns a CompiledFlow instance, which you can use to start an agentic workflow run. Use compile_deploy() to compile and deploy the agentic workflow.
+Python
+compiled_flow = await my_flow_definition.compile_deploy()
+If you only want to generate the JSON model without deploying it, use compile() instead.
+3
+Start a run
+
+Agentic workflows are asynchronous, and the engine communicates with your client using events. You can start a run using methods on the CompiledFlow object. Depending on your needs, you can choose from the following approaches:
+A simple client
+
+Using event handlers
+
+Processing raw events
+
+
+Running agentic workflows with MCP (Public Preview)
+This document provides a technical overview of how the Model Context Protocol (MCP) integrates with the flow execution environment. The integration shows flows as standardized tools that can be discovered, started, and managed by MCP‑compatible clients. The design supports synchronous and asynchronous execution, human‑in‑the‑loop interaction through elicitation, and session‑aware operation.
+MCP automatically publishes each flow as a set of tools with explicit schemas for inputs and outputs. Tool contracts standardize discovery and invocation. Registration requires a Watson Orchestrate endpoint and an access token that is derived from an API key. The token has a limited validity period and must be refreshed to maintain connectivity.
+​
+Capabilities
+Dynamic tool discovery: Each flow model is shown as multiple MCP tools for synchronous execution, asynchronous execution, and status queries.
+Resilient session management: Multi‑session design supports reconnection and cleanup.
+Flexible execution: Synchronous (wait for completion) and asynchronous (claim‑check) patterns.
+Protocol compliance: MCP over Streamable HTTP transport.
+Security: User‑based authorization for all operations.
+​
+Overview
+Tool discovery: Dynamic registration of tools per flow model (synchronous, asynchronous, query) and management tools.
+Management tools: subscribe_flow, replay_flow_pending_elicitation, submit_flow_elicitation, list_flows, cancel_flow.
+​
+Tool registration
+The Flow MCP server provides three tools per flow model to support distinct execution patterns. Draft and versioned models obtain separate tools.
+Naming convention:
+Draft (latest): run_flow_<model_name>
+Specific version: run_flow_<model_name>_<version>
+Tool metadata Each tool includes a _meta section for lifecycle management:
+json
+{
+  "_meta": {
+    "model_id": "string",
+    "version": "string",
+    "model_name": "string",
+    "kind": "string"
+  }
+}
+See all 8 lines
+​
+Tool 1 Synchronous flow execution (run_flow__<model_name>)
+Runs a flow and waits for completion or interruption:
+json
+{
+  "name": "run_flow__purchase_approval",
+  "description": "Process a purchase approval request through the approval workflow",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "item": { "type": "string", "title": "Item Name" },
+      "amount": { "type": "number", "title": "Amount" },
+      "justification": { "type": "string", "title": "Justification" },
+      "_context": {
+        "type": "object",
+        "description": "Optional context parameters for flow execution",
+        "properties": {
+          "thread_id": { "type": "string", "description": "Agent thread ID" },
+          "environment_id": { "type": "string", "enum": ["draft", "live"], "description": "Execution environment" },
+          "channel_id": { "type": "string", "description": "Request channel" },
+          "channel_capabilities": { "type": "array", "items": { "type": "string" } },
+          "agent_id": { "type": "string", "description": "Initiating agent ID" },
+          "agent_version": { "type": "number", "description": "Caller agent version" }
+        }
+      }
+    },
+    "required": ["item", "amount"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "output": {
+        "type": "object",
+        "properties": {
+          "approval_status": { "type": "string", "enum": ["approved", "rejected"] },
+          "approver": { "type": "string" },
+          "comments": { "type": "string" }
+        }
+      },
+      "status": {
+        "type": "object",
+        "properties": {
+          "instance_id": { "type": "string", "description": "Flow run ID" },
+          "name": { "type": "string", "description": "Flow name" },
+          "state": { "type": "string", "enum": ["working","input_required","completed","failed"], "description": "Run state" },
+          "created_at": { "type": "string", "description": "ISO 8601 create time" },
+          "updated_at": { "type": "string", "description": "ISO 8601 last update time" }
+        },
+        "required": ["instance_id", "state"]
+      }
+    },
+    "required": ["status"]
+  }
+}
+See all 50 lines
+​
+Behavior
+Runs to completion or returns on user input.
+Always returns status; includes output only on successful completion with results.
+Elicitations are issued automatically when user input is required.
+Response examples for flows that complete with output:
+json
+{
+  "isError": false,
+  "content": [
+    { "type": "text", "text": "<output JSON>" },
+    { "type": "text", "text": "The flow returned successfully..." }
+  ],
+  "structuredContent": {
+    "output": {
+      "approval_status": "approved",
+      "approver": "manager@example.com",
+      "comments": "Approved"
+    },
+    "status": {
+      "instance_id": "abc-123",
+      "name": "purchase_approval",
+      "state": "completed",
+      "created_at": "2024-01-01T12:00:00.000Z",
+      "updated_at": "2024-01-01T12:05:00.000Z"
+    }
+  }
+}
+See all 21 lines
+Return for input:
+json
+{
+  "isError": false,
+  "content": [
+    { "type": "text", "text": "The flow is waiting for user input..." }
+  ],
+  "structuredContent": {
+    "status": {
+      "instance_id": "abc-123",
+      "name": "purchase_approval",
+      "state": "input_required",
+      "created_at": "2024-01-01T12:00:00.000Z",
+      "updated_at": "2024-01-01T12:03:00.000Z"
+    }
+  }
+}
+See all 15 lines
+​
+Tool 2 Asynchronous flow execution (run_flow_async__<model_name>)
+Starts a flow and returns immediately with an instance_id (claim‑check pattern).
+Specification:
+json
+{
+  "name": "run_flow_async__purchase_approval",
+  "description": "Process a purchase approval request (async)",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "item": { "type": "string" },
+      "amount": { "type": "number" },
+      "justification": { "type": "string" },
+      "_context": { }
+    },
+    "required": ["item", "amount"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "instance_id": { "type": "string", "description": "Started flow instance ID" }
+    },
+    "required": ["instance_id"]
+  }
+}
+See all 21 lines
+​
+Behavior
+Starts execution in the background and returns instance_id.
+Elicitations are issued when user input is required.
+Clients query status through query_flow__<model_name>.
+Response:
+json
+{
+  "isError": false,
+  "content": [
+    { "type": "text", "text": "Flow started" }
+  ],
+  "structuredContent": {
+    "instance_id": "flow-abc123-def456"
+  }
+}
+See all 9 lines
+​
+Tool 3 Flow status query (query_flow__<model_name>)
+Retrieves the status and output (if available) for a flow instance.
+Specification:
+json
+{
+  "name": "query_flow__purchase_approval",
+  "description": "Query status and output by instance ID",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "instance_id": { "type": "string", "description": "Flow run ID" }
+    },
+    "required": ["instance_id"]
+  },
+  "outputSchema": {
+    "type": "object",
+    "properties": {
+      "output": {
+        "type": "object",
+        "properties": {
+          "approval_status": { "type": "string", "enum": ["approved", "rejected"] },
+          "approver": { "type": "string" },
+          "comments": { "type": "string" }
+        }
+      },
+      "status": {
+        "type": "object",
+        "properties": {
+          "instance_id": { "type": "string" },
+          "name": { "type": "string" },
+          "state": { "type": "string", "enum": ["working","input_required","completed","failed"] },
+          "created_at": { "type": "string" },
+          "updated_at": { "type": "string" }
+        },
+        "required": ["instance_id", "name", "state", "created_at", "updated_at"]
+      }
+    },
+    "required": ["status"]
+  }
+}
+See all 36 lines
+Output is present only when the flow completes with results.
+Status is always present and includes execution metadata.
+​
+Context Parameters
+An optional _context object is available for callers to pass in more context, for example, thread_id, environment_id, channel_id, agent_id, agent_version. For the moment, only thread_id (the wxO message thread_id) and environement_id (‘draft’ or ‘live’) are used.
+​
+Elicitation Handling
+When a flow requires user input, an elicitation request is automatically issued to the MCP client. The client must respond within the timeout period to continue flow execution.
+​
+Timeout behavior
+Elicitations timeout after 5 minutes by default.
+When a timeout occurs, the elicitation request fails with a timeout error.
+​
+Recovery from timeout
+If an elicitation times out, note the elicitation ID from the original request.
+Collect the user’s response.
+Call submit_flow_elicitation with the elicitation ID and response data.
+The flow resumes execution with the provided input.
+Example:
+json
+{
+  "instance_id": "flow-abc123-def456",
+  "elicitation_id": "task-789",
+  "response": {
+    "action": "accept",
+    "content": {
+      ... response data ...
+    }
+  }
+}
+See all 10 lines
+​
+Dynamic tool lifecycle management
+The server updates tool registrations in response to flow model events (create, update, delete, activate, deactivate).
+​
+Lifecycle states
+Active: Tools available and executable.
+Deactivated: Tools that are registered but marked unavailable.
+Deleted: Tools registered but marked deleted.
+​
+Behavior
+Tools are marked as [DEACTIVATED] or [DELETED] in descriptions when flows are not runnable.
+Clients are notified through notifications/tools/list_changed when tool availability changes.
+​
+Execution patterns
+​
+Synchronous
+Use run_flow__<flow_name>.
+Suitable for short‑running flows.
+Returns status and, when available, output.
+If user input is required, returns input_required and issues elicitation; continue through the background then query with query_flow__<flow_name>.
+​
+Asynchronous (claim‑check)
+Use run_flow_async__<flow_name>.
+Returns instance_id immediately; query with query_flow__<flow_name>.
+Elicitations are issued as needed; execution continues in the background.
+​
+Authorization model
+Identity: Each request is associated with an authenticated principal.
+Ownership: Initiators can list, query, subscribe to, replay elicitations for, and cancel their own flow instances.
+Session binding: Operations are validated per session.
+Operation checks: Authorization is evaluated for each action (subscribe_flow, replay_flow_pending_elicitation, submit_flow_elicitation, list_flows, cancel_flow).
+​
+Session management
+Unique session IDs per MCP client and clean up on disconnect.
+​
+MCP Context Forge support
+The flow MCP server is compatible with MCP Context Forge for enhanced context management and orchestration. Current Context Forge clients do not support MCP elicitations; human‑in‑the‑loop features are not available through that path. For more information see, MCP context forge.
+​
+Connecting to Flow MCP Server
+To connect to the Flow MCP server as a remote MCP endpoint, obtain the Watson Orchestrate API endpoint for your instance (https://api.<hostname>/instances/<tenant_id>) and append /v1/orchestrate/flows/mcp. Generate an access token from an API key that uses the documented process and provide it during registration. The access token has a limited validity period, refresh and reregister when it expires.
+​
+References
+Scheduler (Public Preview)
+Agentic workflow includes a built-in business scheduler. You can use it to schedule an agentic workflow or an agent to run at a later time.
+Many business scenarios require schedule execution. For example:
+Example 1
+Example 2
+Example 3
+TEXT
+Schedule this Helpdesk monitoring agentic workflow to run every weekday at 7 AM.
+Show supported features
+
+​
+Scheduling an agentic workflow
+To make an agentic workflow schedulable, enable the schedulable option in the @flow decorator:
+Python
+@flow(
+        name = "alert_helpdesk_flow",
+        input_schema=Product,
+        output_schema=Message,
+        schedulable=True
+    )
+After enabling this option, you can schedule the agentic workflow using a natural language command like:
+TEXT
+I want to schedule a call to alert_helpdesk_floeryday at 7am EST for 3 days
+​
+Scheduling an agent
+Agents aren’t directly schedulable. Instead, use the agent_run tool to schedule an agent with a request.
+First, add the tool to an agent. For more information, see agent_scheduler.
+The agent_run tool is an agentic workflow with a single agent node that calls the specified agent with a request. After adding the tool, schedule the agent like this:
+TEXT
+I want to schedule agent "<agent id>" to run every day at 9 AM.
+Running agentic workflows with MCP (Public Preview)
+Previous
+Agentic
+
+Agentic workflow expressions
+When working with agentic workflows, expressions used in branching, looping, and data mapping must follow a defined syntax. This structure also applies to the generated data map within the model.
+Below are the keywords and reference patterns used in agentic workflow expressions:
+Refers to the top-level agentic workflow context:
+Python
+flow
+Refers to the parent context, equivalent to the top-level agentic workflow for nodes within it:
+Python
+parent
+Refers to the current node:
+Python
+self
+Refers to inputs and outputs of the current agentic workflow within agentic workflow nodes:
+Python
+parent.[input|output].<name>
+parent.[input|output]["<name>"]
+Refers to the current index in a foreach loop, returns null if not in a loop:
+Python
+parent._current_index
+Refers to the current item in a foreach loop, returns null if not in a loop:
+Python
+parent._current_item
+Refers to inputs and outputs of other nodes within the current agentic workflow:
+Python
+parent.<nodeName>.[input|output].<name>
+parent["<nodeName>"].[input|output]["<name>"]
+Refers to inputs of the current node:
+Python
+self["input"].<name>
+self["input"]["name"]

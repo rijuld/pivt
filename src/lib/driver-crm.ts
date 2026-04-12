@@ -51,23 +51,55 @@ const DISPATCH_NINA: CrmContact = {
   org: "Midland Freight Dispatch",
 };
 
+/** Deterministic demo names for loads without CRM columns in the DB. */
+const FALLBACK_DRIVER_NAMES = [
+  "Marco Ruiz",
+  "Elena Vasquez",
+  "Jordan Miles",
+  "Sam Okonkwo",
+  "Rosa Delgado",
+  "Chris Park",
+  "Andre Williams",
+  "Tanya Brooks",
+] as const;
+
+const FALLBACK_DISPATCH_NAMES = [
+  "Nina Patel",
+  "Marcus Webb",
+  "Alicia Chen",
+  "Priya Singh",
+  "Denise Hart",
+  "Tom Brennan",
+] as const;
+
+function hashShipmentId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 33 + id.charCodeAt(i)) >>> 0;
+  return h;
+}
+
 function fallbackCrm(shipmentId: string): ShipmentDriverCrm {
+  const h = hashShipmentId(shipmentId);
+  const driverName = FALLBACK_DRIVER_NAMES[h % FALLBACK_DRIVER_NAMES.length];
+  const dispatchName =
+    FALLBACK_DISPATCH_NAMES[(h >>> 4) % FALLBACK_DISPATCH_NAMES.length];
+  const ext = String(1000 + (h % 9000)).padStart(4, "0");
   return {
     shipmentId,
     driver: {
       id: `drv-${shipmentId}`,
-      name: "Assigned driver",
+      name: driverName,
       role: "driver",
-      phone: "+1 (555) 555-0100",
-      email: `driver.load+${shipmentId.toLowerCase()}@carrier.example.com`,
+      phone: `+1 (555) 555-${ext.slice(0, 4)}`,
+      email: `${driverName.split(/\s+/)[0]!.toLowerCase()}.${shipmentId.toLowerCase()}@carrier.example.com`,
       org: "Network carrier",
     },
     dispatcher: {
       id: `dsp-${shipmentId}`,
-      name: "Floor dispatch",
+      name: dispatchName,
       role: "dispatcher",
-      phone: "+1 (800) 555-0111",
-      email: `dispatch@networkcarrier.example.com`,
+      phone: `+1 (800) 555-${ext.slice(0, 4)}`,
+      email: `dispatch.${shipmentId.toLowerCase()}@networkcarrier.example.com`,
       org: "Network carrier",
     },
     timeline: [

@@ -91,7 +91,7 @@ export function DriverUpdatesPanel({
     );
   }
 
-  function sendToDriver(channel: "message" | "email") {
+  async function sendToDriver(channel: "message" | "email") {
     const t = composer.trim();
     if (!t) return;
     setOutbound((prev) => [
@@ -108,6 +108,14 @@ export function DriverUpdatesPanel({
       },
     ]);
     setComposer("");
+    try {
+      await fetch(
+        `/api/ships/${encodeURIComponent(selectedId)}/driver-route-notice-ack`,
+        { method: "POST" },
+      );
+    } catch {
+      /* non-blocking — SQLite/Redis ack is best-effort */
+    }
   }
 
   const singleLoad = fleet.length === 1;
@@ -121,11 +129,6 @@ export function DriverUpdatesPanel({
         {singleLoad ? (
           <p className="border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 font-mono text-[12px] font-semibold text-[var(--foreground)]">
             {fleet[0].id}
-            {fleet[0].isPrimary ? (
-              <span className="ml-1.5 text-[10px] font-normal text-[var(--muted)]">
-                · featured
-              </span>
-            ) : null}
           </p>
         ) : (
           <select
@@ -133,15 +136,11 @@ export function DriverUpdatesPanel({
             onChange={(e) => onSelectShipment(e.target.value)}
             className="w-full max-w-md border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[12px] text-[var(--foreground)] outline-none ring-[var(--accent)]/40 focus:ring-2"
           >
-            {loadIds.map((id) => {
-              const ship = fleet.find((s) => s.id === id);
-              return (
-                <option key={id} value={id}>
-                  {id}
-                  {ship?.isPrimary ? " · featured" : ""}
-                </option>
-              );
-            })}
+            {loadIds.map((id) => (
+              <option key={id} value={id}>
+                {id}
+              </option>
+            ))}
           </select>
         )}
       </div>

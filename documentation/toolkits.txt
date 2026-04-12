@@ -1,0 +1,228 @@
+What are toolkits?
+Toolkits are collections of tools that must be imported or removed as a single unit. Currently, watsonx Orchestrate supports one type of toolkit: the Model Context Protocol (MCP).
+​
+Supported toolkit formats
+watsonx Orchestrate supports MCP toolkits built using the stdio transport, implemented in either Python or Node.js. These toolkits run inside the Orchestrate runtime, similar to standalone Python tools. You can import MCP toolkits from:
+npm (for Node.js)
+PyPI (for Python)
+Local filesystem (without publishing to a package registry)
+Remote MCP server
+​
+Tool naming convention
+When you import a toolkit, Orchestrate exposes each tool within it individually using the naming format:
+toolkit_name:tool_name
+
+Importing local MCP toolkits
+The 2.0 release introduces a breaking change: the former orchestrate toolkits import command has been renamed to orchestrate toolkits add. Additionally, a new orchestrate toolkits import command has been added, which works on files in a way that is the inverse of the orchestrate toolkits export command.
+​
+Adding directly from the CLI
+Use the orchestrate toolkits add command to add a local MCP toolkit into your environment.
+BASH
+orchestrate toolkits add
+Show command flags
+
+Examples:
+Adding from pypi
+Importing from npm
+Local Python
+Local Nodejs
+BASH
+# Setup connection if not already set
+orchestrate connections add -a tavily
+for env in draft live; do
+    orchestrate connections configure -a tavily --env $env --type team --kind key_value
+    orchestrate connections set-credentials -a tavily --env $env -e "TAVILY_API_KEY=$TAVILY_API_KEY"
+done
+
+# Import the toolkit
+# Note this is a third party mcp server for illustrative purposes only, use the npm variant for production use
+orchestrate toolkits add --kind mcp \
+  --name tavily \
+  --description "Search the internet" \
+  --command "pipx  -y mcp-tavily@0.1.10" \
+  --tools "*"  \
+  --app-id tavily
+​
+Importing from a file
+It is also possible to import an MCP server configuration from a file. The file contains the same configuration options used by the add command, within a yaml file, but is easier to integrate with import scripts and CI/CD pipelines.
+BASH
+orchestrate connections add -a my_connection
+for env in draft live; do
+    orchestrate connections configure -a my_connection --env $env --type team --kind key_value
+    orchestrate connections set-credentials -a my_connection --env $env -e "SECURE_ENVIRONMENT_VARIABLE=value"
+done
+
+orchestrate toolkits import -f toolkit_name.yaml -a my_connection
+toolkit_name.yaml
+spec_version: v1
+kind: mcp
+name: toolkit_name
+command: uvx ibm-watsonx-orchestrate-mcp-server
+env: []
+tools:
+  - *
+connections:
+  - my_connection
+package_root: ./my_toolkit_folder # <-- This is the folder containing your mcp server. The path is relative to this file.
+​
+Supported connection types for local MCP servers
+Local MCP servers can use multiple connection types, and each connection type exposes a specific set of environment variables to the server. These variables allow MCP tools to read the required credentials directly at runtime. The following environment variables are provided for each connection type:
+Basic Connections
+
+Bearer Connections
+
+API Key Connections
+
+OAuth (Client Credentials)
+
+OAuth (Auth Code)
+
+🚧 OAuth (Implicit)
+
+OAuth (Password)
+
+🌐 OAuth (SSO/IDP Flow)
+
+Key Value Connections
+
+Importing remote MCP toolkits
+The 2.0 release contains a breaking change renaming what was previously the orchestrate toolkits import command as the orchestrate toolkits add command. A new orchestrate toolkits import command was introduced which operates on files in manner inverse from the orchestrate toolkits export command.
+Remote MCP integration lets you connect watsonx Orchestrate to external toolkits hosted on remote servers. Use this setup when your tools live outside your local environment, such as in cloud services or third-party APIs. You can import and manage them using the ADK CLI.
+​
+Adding remote MCP toolkits using ADK CLI
+To import a remote MCP, run the orchestrate toolkits add command with the URL and transport protocol for the MCP server.
+BASH
+orchestrate toolkits add --kind mcp --name <toolkit-name> --description <toolkit-description>  --url <toolkit-url>  --transport <protocol-for-remote-mcp> --tools <tools>  --app-id <connection>
+Show command flags
+
+Examples:
+Using SSE
+Using streamable HTTP
+This example connects watsonx Orchestrate to CoinGecko remote MCP server using SSE. For more information, see CoinGecko MCP Server
+BASH
+orchestrate toolkits add --kind mcp --name coingecko --description "coingecko toolkit"  --url "https://mcp.api.coingecko.com/sse"  --transport "sse" --tools "get_range_coins_market_chart"
+​
+Importing from a file
+You can also import an MCP server configuration from a file. The file contains the same configuration options used by the add command, within a yaml file, but is easier to integrate with import scripts and CI/CD pipelines.
+BASH
+orchestrate connections add -a my_connection
+for env in draft live; do
+    orchestrate connections configure -a my_connection --env $env --type team --kind key_value
+    orchestrate connections set-credentials -a my_connection --env $env -e "SECURE_ENVIRONMENT_VARIABLE=value"
+done
+
+orchestrate toolkits import -f toolkit_name.yaml -a my_connection
+toolkit_name.yaml
+spec_version: v1
+kind: mcp
+name: toolkit_name
+transport: streamable_http # streamable_http|sse
+server_url: http://my-mcp-server/mcp
+tools:
+  - *
+connections:
+  - my_connection
+​
+Understanding the import process
+During import, ADK connects to the remote MCP server to retrieve and validate available tools.
+ADK checks only the tool schemas for structural correctness and compatibility with watsonx Orchestrate. It doesn’t test tool execution at this stage.
+watsonx Orchestrate waits up to 30 seconds for the server to respond with the tool list. If the server responds in time, the import continues. If not, the process fails or times out.
+ADK doesn’t test individual tools during import, so no execution timeouts apply at this stage.
+​
+Choosing an MCP protocol
+ADK supports two transport protocols for MCP:
+Server-Sent Events (SSE)
+Streamable HTTP
+You must choose the transport protocol explicitly. ADK doesn’t support fallback or automatic switching between protocols.
+Any MCP server that follows the standard protocol and supports SSE or streamable HTTP works without extra configuration.
+When you use the ADK CLI, Remote MCP supports multiple authentication methods:
+OAuth2 (without Dynamic Client Registration)
+API Key
+Bearer Token
+Basic Auth
+Key-value
+Note:
+When connecting to a remote MCP server that uses an API key with a custom name, use the key–value pair method.
+For OAuth authentication, import the toolkit using Team credentials. To use the tool, you can either switch to Member credentials or continue using Team credentials.
+For more information about connections, see Connections.
+​
+Tracing, tenant and agent context
+When Orchestrate calls a remote MCP server through the MCP Gateway, it automatically includes standard tracing information so downstream services can participate in the same request trace for observability and debugging. The tracing context (traceparent and tracestate) is always included and passed in the request metadata. This behavior is built in and requires no configuration.
+You can also attach correlation identifiers that help with governance, audit logging, and usage attribution. These values are passed as request headers:
+tenant_id: identifies the customer or tenant
+agent_id: identifies the calling agent
+The following example shows an MCP server definition that includes contextual metadata:
+YAML
+spec_version: v1
+kind: mcp
+name: doc-mcp
+description: helps you talk to the manager
+url: https://developer.watson-orchestrate.ibm.com/mcp
+transport: streamable_http
+metadata:
+    allowed_context:
+        - my_context_1
+        - my_context_2To
+tenant_id and agent_id are not sent by default. You must configure them when you import the remote MCP server or toolkit in the ADK. The tracing context (traceparent, tracestate) is always included and is not configurable.
+​
+Using SSE protocol
+When you use SSE, ADK starts the handshake with a 30-second timeout. This timeout applies during the callback phase of the import.
+ADK expects only standard SSE headers. The connection setup stays minimal and depends on the server for protocol compliance.
+ADK doesn’t enforce connection pooling or keep-alive settings. If your server supports them, ADK works with those features.
+During tool execution testing, you might see End of File (EOF) errors. These usually happen when the server times out or doesn’t respond in time.
+​
+Using streamable HTTP protocol
+When you use streamable HTTP, ADK also starts the handshake with a 30-second timeout.
+ADK doesn’t expect SSE headers in this case. The setup remains minimal and relies on the server to follow the protocol.
+​
+Handling import errors
+If the server returns an HTTP status code in the 4xx range, the import fails. These errors usually point to invalid requests, authentication issues, or missing resources.
+Other status codes may trigger warnings, depending on the server’s response.
+ADK doesn’t distinguish between import-time and runtime execution from the server’s perspective. All responses during import return in JSON format.
+Importing local MCP toolkits
+Previous
+Managing
+
+Managing toolkits
+Manage the toolkits in your active environment.
+​
+Listing toolkits
+Use the orchestrate tools list command to list all tools in your environment. You can also use the --verbose (-v) flag to get detailed information about each tool in JSON format.
+BASH
+orchestrate toolkits list -v
+Exporting remote MCP toolkits with the ADK CLI enables you to package and distribute custom tool integrations for watsonx Orchestrate. This process ensures consistent agent workflows across environments and simplifies deployment for development, testing, or production. Use this capability when you need to share toolkits with other teams, migrate configurations, or maintain version control for your MCP integrations.
+​
+Exporting remote MCP toolkits using ADK CLI
+Use the ADK CLI to export a remote MCP toolkit configuration for deployment or integration.
+BASH
+orchestrate toolkits export -n my-toolkit -o my-toolkit.zip
+​
+Updating toolkits
+Unlike tools, it is not possible to update a toolkit. Instead, the toolkit must first be removed, and then reimported again as shown in the following example.
+1
+Delete the existing toolkit
+
+BASH
+orchestrate toolkits remove -n my-toolkit-name
+2
+Import the toolkit with the new specs
+
+BASH
+  orchestrate toolkits add \
+      --kind mcp \
+      --name my-toolkit-name \
+      --description "helps you talk to the manager" \
+      --package-root /path/to/folder \
+      --command '["node", "dist/index.js", "--transport", "stdio"]' \
+      --tools "*" \
+      --app-id "my_app_id" 
+3
+Import all agents that use the toolkit
+
+For more information, see Importing agents.
+​
+Removing toolkits
+Removing a toolkit will remove all tools provided by that toolkit. To remove an existing toolkit, run:
+BASH
+orchestrate toolkits remove -n my-toolkit-name
+d

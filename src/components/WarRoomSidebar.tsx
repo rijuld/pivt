@@ -6,6 +6,7 @@ import type { CompanyProfile } from "@/lib/company-profile";
 import {
   formatShipmentExtras,
   formatShipmentRoute,
+  sortFleetByWeatherAttention,
   type ActiveShipment,
 } from "@/lib/shipments";
 import { BrandLogo } from "./BrandLogo";
@@ -27,6 +28,10 @@ interface WarRoomSidebarProps {
   companyProfile: CompanyProfile | null;
   profileLoading: boolean;
   onEditProfile: () => void;
+  /** Loads whose corridors hit an NWS alert (cached snapshot). */
+  weatherAttentionShipmentIds: string[];
+  /** Loads where all Response flow agents have completed successfully for this alert. */
+  attentionFlowResolvedShipmentIds: string[];
 }
 
 function friendlyLoadLabel(id: string) {
@@ -38,23 +43,6 @@ function shipmentBadge(
   phase: MapPhase,
   scenario: ScenarioKind,
 ): { icon: string; tone: "vip" | "wx" | "ok"; line: string } {
-  if (s.isPrimary) {
-    if (phase !== "nominal" && scenario === "blizzard") {
-      return {
-        icon: "★",
-        tone: "vip",
-        line: "Heavy weather — watch this lane",
-      };
-    }
-    if (phase !== "nominal" && scenario === "port_strike") {
-      return {
-        icon: "★",
-        tone: "vip",
-        line: "Port disruption — coastal path blocked",
-      };
-    }
-    return { icon: "★", tone: "vip", line: "On time · starred load" };
-  }
   if (
     scenario === "blizzard" &&
     phase !== "nominal" &&
@@ -82,16 +70,17 @@ export function WarRoomSidebar({
   companyProfile,
   profileLoading,
   onEditProfile,
+  weatherAttentionShipmentIds,
+  attentionFlowResolvedShipmentIds,
 }: WarRoomSidebarProps) {
   const [editor, setEditor] = useState<
     { mode: "create" } | { mode: "edit"; ship: ActiveShipment } | null
   >(null);
 
-  const sidebarShipments = useMemo(() => {
-    const primary = fleet.filter((s) => s.isPrimary);
-    const rest = fleet.filter((s) => !s.isPrimary).slice(0, 6);
-    return [...primary, ...rest];
-  }, [fleet]);
+  const sidebarShipments = useMemo(
+    () => sortFleetByWeatherAttention(fleet, weatherAttentionShipmentIds),
+    [fleet, weatherAttentionShipmentIds],
+  );
 
   const laneCount = fleet.length;
 
@@ -171,20 +160,26 @@ export function WarRoomSidebar({
               const b = shipmentBadge(s, phase, activeScenario);
               const extras = formatShipmentExtras(s);
               const selected = selectedShipmentId === s.id;
+              const needsAttentionPulse =
+                weatherAttentionShipmentIds.includes(s.id) &&
+                !attentionFlowResolvedShipmentIds.includes(s.id);
+              const cardBorderClass = needsAttentionPulse
+                ? "attention-card-blink border-rose-500/55 ring-2 ring-rose-500/30"
+                : selected
+                  ? "border-[var(--accent)]/50 ring-1 ring-[var(--accent)]/30"
+                  : "border-[var(--border)]";
               return (
                 <div
                   key={s.id}
-                  className={`flex items-start gap-2 border bg-[var(--surface-card)] p-2.5 transition ${
-                    selected
-                      ? "border-[var(--accent)]/50 ring-1 ring-[var(--accent)]/30"
-                      : `border-[var(--border)] ${s.isPrimary ? "ring-1 ring-[var(--accent)]/15" : ""}`
-                  }`}
+                  className={`flex items-start gap-2 border bg-[var(--surface-card)] p-2.5 transition ${cardBorderClass}`}
+                  aria-live={needsAttentionPulse ? "polite" : undefined}
                 >
                   <button
                     type="button"
                     onClick={() => onSelectShipment(s.id)}
                     className="flex min-w-0 flex-1 cursor-pointer items-start gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/50"
                   >
+                    <span className="w-2 shrink-0" aria-hidden />
                     <ShipmentIcon icon={b.icon} tone={b.tone} />
                     <div className="min-w-0 flex-1">
                       <p className="font-mono text-[11px] font-semibold text-[var(--foreground)]">

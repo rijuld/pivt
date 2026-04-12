@@ -70,6 +70,10 @@ export interface ActiveShipment {
    * Last entry is the final delivery (kept in sync with dest_*).
    */
   dropOffsJson: string | null;
+  /** Letter option (e.g. A, B) chosen from Optimizing Pivt; persisted in SQLite. */
+  optimizingSelectedRoute: string | null;
+  /** User skipped committing a Maps option and asked to re-check facility inventory. */
+  optimizingRouteOptOut: boolean;
 }
 
 export function formatShipmentRoute(s: ActiveShipment): string {
@@ -101,6 +105,20 @@ export function primaryShipment(
   fleet: ActiveShipment[],
 ): ActiveShipment | null {
   return fleet.find((s) => s.isPrimary) ?? null;
+}
+
+/** Loads needing NWS attention first, then stable id order (aligned with ``listShips`` tie-break). */
+export function sortFleetByWeatherAttention(
+  fleet: ActiveShipment[],
+  attentionShipmentIds: readonly string[],
+): ActiveShipment[] {
+  const att = new Set(attentionShipmentIds);
+  return [...fleet].sort((a, b) => {
+    const da = att.has(a.id) ? 1 : 0;
+    const db = att.has(b.id) ? 1 : 0;
+    if (da !== db) return db - da;
+    return a.id.localeCompare(b.id);
+  });
 }
 
 /** Alert epicenters for heatmap + proximity (scenario + DB-backed primary / app settings). */

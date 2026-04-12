@@ -80,3 +80,16 @@ export function endpointsForLane(
     destLng: d.lng,
   };
 }
+
+/** Known demo anchor points (air / intermodal style codes) for relay search. */
+export function listLogisticsAnchorCoords(): {
+  code: string;
+  lat: number;
+  lng: number;
+}[] {
+  return Object.entries(AIRPORT_COORDS).map(([code, c]) => ({
+    code,
+    lat: c.lat,
+    lng: c.lng,
+  }));
+}

@@ -1,4 +1,4 @@
-import * as topojson from "topojson-client";
+import { feature, mesh } from "topojson-client";
 import { geoAlbersUsa, geoPath } from "d3-geo";
 import type {
   Feature,
@@ -14,6 +14,7 @@ import type {
   WeatherMapPoint,
 } from "@/lib/weather-route-intersection";
 import countriesJson from "world-atlas/countries-110m.json";
+import statesTopo from "us-atlas/states-10m.json";
 
 export const US_MAP_VIEW_WIDTH = 720;
 export const US_MAP_VIEW_HEIGHT = 450;
@@ -21,6 +22,7 @@ export const US_MAP_VIEW_HEIGHT = 450;
 type Cached = {
   projection: ReturnType<typeof geoAlbersUsa>;
   landPathD: string;
+  stateBordersPathD: string;
 };
 
 let cached: Cached | null = null;
@@ -28,10 +30,10 @@ let cached: Cached | null = null;
 function getUsAlbersCached(): Cached {
   if (cached) return cached;
 
-  const topo = countriesJson as unknown as Parameters<typeof topojson.feature>[0];
+  const topo = countriesJson as unknown as Parameters<typeof feature>[0];
   const countriesObj = (countriesJson as { objects: { countries: unknown } }).objects
     .countries;
-  const fc = topojson.feature(topo, countriesObj as never) as unknown as FeatureCollection;
+  const fc = feature(topo, countriesObj as never) as unknown as FeatureCollection;
   const us = fc.features.find(
     (f) => (f.properties as { name?: string } | null)?.name === "United States of America",
   ) as Feature<Polygon | MultiPolygon> | undefined;
@@ -46,7 +48,20 @@ function getUsAlbersCached(): Cached {
   );
   const pathGen = geoPath(projection);
   const landPathD = pathGen(us) ?? "";
-  cached = { projection, landPathD };
+
+  const statesObj = (
+    statesTopo as unknown as {
+      objects: { states: Parameters<typeof mesh>[1] };
+    }
+  ).objects.states;
+  const stateMesh = mesh(
+    statesTopo as unknown as Parameters<typeof mesh>[0],
+    statesObj,
+    (a, b) => a !== b,
+  );
+  const stateBordersPathD = pathGen(stateMesh as never) ?? "";
+
+  cached = { projection, landPathD, stateBordersPathD };
   return cached;
 }
 
@@ -66,7 +81,7 @@ export function buildUsMapDisplay(
   points: WeatherMapPoint[],
   routes?: { shipmentId: string; coordinates: [number, number][] }[],
 ): UsMapDisplay {
-  const { projection, landPathD } = getUsAlbersCached();
+  const { projection, landPathD, stateBordersPathD } = getUsAlbersCached();
   const pathGen = geoPath(projection);
   const routePaths: UsMapRoutePath[] = [];
 
@@ -100,6 +115,7 @@ export function buildUsMapDisplay(
     viewBoxWidth: US_MAP_VIEW_WIDTH,
     viewBoxHeight: US_MAP_VIEW_HEIGHT,
     landPathD,
+    stateBordersPathD,
     routePaths,
     markers,
   };

@@ -2,15 +2,8 @@
 
 import type { UsMapDisplay } from "@/lib/weather-route-intersection";
 
-const ROUTE_STROKES = [
-  "#38bdf8",
-  "#fbbf24",
-  "#a78bfa",
-  "#34d399",
-  "#fb7185",
-  "#f472b6",
-  "#2dd4bf",
-];
+/** Corridor polylines — single color for all affected routes. */
+const ROUTE_STROKE = "#f43f5e";
 
 /** NWS `severity`: Extreme, Severe, Moderate, Minor, Unknown */
 function markerColorForSeverity(severity: string): string {
@@ -32,7 +25,14 @@ export function WeatherAlertsMap({ display }: { display: UsMapDisplay | null }) 
     );
   }
 
-  const { viewBoxWidth, viewBoxHeight, landPathD, routePaths, markers } = display;
+  const {
+    viewBoxWidth,
+    viewBoxHeight,
+    landPathD,
+    stateBordersPathD,
+    routePaths,
+    markers,
+  } = display;
   const hasRoutes = routePaths.length > 0;
   const hasMarkers = markers.length > 0;
 
@@ -56,12 +56,26 @@ export function WeatherAlertsMap({ display }: { display: UsMapDisplay | null }) 
           strokeLinejoin="round"
         />
 
-        {routePaths.map((rp, i) => (
+        {stateBordersPathD ? (
+          <path
+            d={stateBordersPathD}
+            fill="none"
+            stroke="#5a7a96"
+            strokeWidth={0.45}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+            opacity={0.85}
+          >
+            <title>State boundaries</title>
+          </path>
+        ) : null}
+
+        {routePaths.map((rp) => (
           <path
             key={rp.shipmentId}
             d={rp.pathD}
             fill="none"
-            stroke={ROUTE_STROKES[i % ROUTE_STROKES.length]}
+            stroke={ROUTE_STROKE}
             strokeWidth={2.25}
             strokeLinecap="round"
             strokeLinejoin="round"

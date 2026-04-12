@@ -87,6 +87,22 @@ body {
   animation: slide-up 0.4s ease-out forwards;
 }
 
+/** Sidebar load row — NWS attention until Response flow agents complete */
+@keyframes attention-card-blink {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(244, 63, 94, 0.4);
+    background-color: rgba(127, 29, 29, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.55);
+    background-color: rgba(153, 27, 27, 0.2);
+  }
+}
+.attention-card-blink {
+  animation: attention-card-blink 1.25s ease-in-out infinite;
+}
+
 /* ─── scrollbar ─── */
 .thin-scrollbar::-webkit-scrollbar {
   width: 4px;

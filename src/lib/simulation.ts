@@ -6,7 +6,6 @@ export type AgentId =
   | "watchman"
   | "node_manager"
   | "negotiator"
-  | "cfo"
   | "diplomat"
   | "system";
 
@@ -37,7 +36,6 @@ const AGENT_META: Record<
   watchman: { emoji: "📡", label: "Routing Pivt", color: "#a78bfa" },
   node_manager: { emoji: "🌐", label: "Facility Pivt", color: "#fbbf24" },
   negotiator: { emoji: "🗺️", label: "Optimizing Pivt", color: "#38bdf8" },
-  cfo: { emoji: "⚖️", label: "Cost Pivt", color: "#34d399" },
   diplomat: { emoji: "✉️", label: "Driver Pivt", color: "#fb7185" },
   system: { emoji: "⚙️", label: "Signal ingest", color: "#94a3b8" },
 };
@@ -83,7 +81,7 @@ export const BLIZZARD_STEPS: SimStep[] = [
   },
   {
     id: "b5",
-    agent: "cfo",
+    agent: "negotiator",
     title: "Financial guardrail",
     body: "SLA penalty ≈ $4k. Rejecting Route A ($4.8k > penalty, not VIP). Approving Route C: $1.2k < $4k saved.",
     timestamp: "14:02:07",
@@ -137,7 +135,7 @@ export const PORT_STRIKE_STEPS: SimStep[] = [
   },
   {
     id: "p5",
-    agent: "cfo",
+    agent: "negotiator",
     title: "Decision",
     body: "Contract penalty $6k if >24h late. Route C premium $2.1k — within guardrail. Rejecting pure air.",
     timestamp: "14:02:07",

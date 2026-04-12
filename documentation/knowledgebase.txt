@@ -1,0 +1,330 @@
+Creating knowledge bases
+With the ADK, you can create knowledge bases for your agents, either by connecting to your own Elasticsearch or Milvus instance, or by uploading your documents.
+Use YAML, JSON or Python files to create your knowledge bases for watsonx Orchestrate.
+​
+Creating built-in Milvus knowledge bases
+If you don’t have an existing Milvus or Elasticsearch instance to connect to, you can create a knowledge base by simply uploading your documents. These documents will be ingested into the built-in Milvus instance, which will serve as the backend for your knowledge base.
+The supported documents must follow these requirements:
+Each file must have a unique name.
+A single batch can include up to 20 files, with a total size limit of 30 MB.
+The maximum file size for .docx, .pdf, .pptx, and .xlsx files is 25 MB.
+The maximum file size for .csv, .html, and .txt files is 5 MB.
+The embedding model can be either a model hosted on watsonx.ai or a custom model of type embedding.
+Note: The embeddings_model_name field is optional. If you don’t provide it, the system uses ibm/slate-125m-english-rtrvr-v2 by default.
+Example using an OpenAI embedding model:
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+kind: knowledge_base 
+name: knowledge_base_name
+description: |
+   A description of what information this knowledge base addresses
+documents:
+   - path: IBM_wikipedia.pdf
+     url: https://url/IBM
+   - path: history_of_ibm.pdf
+     url: https://url/History_of_IBM
+vector_index:
+   embeddings_model_name: virtual-model/openai/text-embedding-3-small
+See all 12 lines
+Example using a watsonx.ai embedding model:
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+kind: knowledge_base 
+name: knowledge_base_name
+description: |
+   A description of what information this knowledge base addresses
+documents:
+   - "/file-path-1.pdf"
+   - "relative-path/file-path-2.pdf"
+vector_index:
+   embeddings_model_name: ibm/slate-125m-english-rtrvr-v2
+See all 10 lines
+Once the knowledge base is created, you can check its status to see when it’s ready for use.
+​
+Creating external knowledge bases
+External knowledge bases allow you to connect your existing Milvus or Elasticsearch databases as a knowledge source for your agent. To configure a knowledge base with your external database, use the conversational_search_tool.index_config to define the connection details for your Milvus or Elasticsearch instance.
+Use the field_mapping in your index_config to to specify which fields from the search results are used for the title, body and optionally url of the search result
+​
+Milvus
+When connecting to a Milvus instance:
+Ensure the provided embedding_model_id is the one used when ingesting the documents in your index.
+Additionally, ensure you use the GRPC host and port from your Milvus instance Connections will fail if you use the HTTP host or port.
+Optionally, provide the server_cert to use a custom server certificate when connecting to a Milvus instance.
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+kind: knowledge_base 
+name: knowledge_base_name
+description: |
+   A description of what information this knowledge base addresses
+prioritize_built_in_index: false
+conversational_search_tool:
+   index_config:
+      - milvus:
+         grpc_host: my.grpc-host.com
+         grpc_port: "1234"
+         server_cert: <custom server certificate>
+         database: database-name
+         collection: collection-or-alias-name
+         index: index-name
+         embedding_model_id: ibm/slate-125m-english-rtrvr
+         filter: <filter for search>
+         field_mapping:
+            title: title-field
+            body: text-field
+            url: url-field
+See all 21 lines
+​
+ElasticSearch
+For Elasticsearch, you can provide a custom query_body that will be sent as the POST body in the search request. This allows for advanced query customization.
+If provided, the query_body must include the $QUERY token, which will be replaced by the user’s query at runtime.
+If no custom query_body is provided, a keyword search will be used.
+To further customize the ElasticSearch query, result_filter can be set to an array of ElasticSearch filters. If using both query_body and result_filter, the query_body must include the $FILTER token, which will be replaced by the result_filter array at runtime.
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+kind: knowledge_base 
+name: knowledge_base_name
+description: |
+   A description of what information this knowledge base addresses
+prioritize_built_in_index: false
+conversational_search_tool:
+   index_config:
+      - elastic_search:
+         url: https://my.elasticsearch-instance.com
+         index: my-index-name
+         port: "1234"
+         query_body: {"size":10,"query":{"bool":{"should":[{"text_expansion":{"ml.tokens":{"model_id":".elser_model_2_linux-x86_64","model_text":"$QUERY"}}}],"filter":"$FILTER"}}}
+         result_filter: [{"match":{"title":"A_keyword_in_title"}},{"match":{"text":"A_keyword_in_text"}},{"match":{"id":"A_specific_ID"}}]
+         field_mapping:
+            title: title-field
+            body: text-field
+            url: url-field
+See all 18 lines
+For more information about ElasticSearch query body and filters customizations, see How to configure the advanced Elasticsearch settings
+​
+Custom search
+With custom search, you can connect your own search server, enabling out-of-the-box alternatives to the default search solutions.
+To set up a custom search, configure the URL and optionally the filter and metadata for your search. For example:
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+kind: knowledge_base 
+name: knowledge_base_name
+description: |
+   A description of what information this knowledge base addresses
+prioritize_built_in_index: false
+conversational_search_tool:
+   index_config:
+      - custom_search:
+         url: https://my.custom-server.com
+         filter: my custom filter
+         metadata:
+            foo: bar
+See all 13 lines
+Some custom search configurations require authentication. In that case, create a connection and pass it along with the knowledge base when you import it.
+To set up the server for your custom service, see Connecting to a content repository on a custom service.
+​
+AstraDB
+To connect to AstraDB knowledge base, in your knowledge base file, configure the api_endpoint, data_type, and embedding_mode for your AstraDB. You can also configure optional fields like port, server_cert, keyspace, collection, table, index_column, embedding_model_id, search_mode, limit, filter, and field_mapping.
+
+YAML
+
+JSON
+spec_version: v1
+kind: knowledge_base 
+name: knowledge_base_name
+description: |
+   A description of what information this knowledge base addresses
+prioritize_built_in_index: false
+conversational_search_tool:
+   index_config:
+      - astradb:
+         api_endpoint: 'https://xxx-us-east-2.apps.astra.datastax.com'
+         keyspace: default_keyspace
+         data_type: collection      ## Possible values: `collection` or `table`
+         collection: search_wa_docs
+##       table: search_wa_docs         (Only if `data_type` is `table`)
+##       index_column: 1               (Only if `data_type` is `table`)
+         embedding_model_id: ibm/slate-125m-english-rtrvr
+         embedding_mode: server     ## Possible values: `server` or `client`
+         port: '443'
+         search_mode: vector        ## Possible values: `vector` when `data_type` is `table` OR `vector`, `lexical`, and `hybrid` when `data_type` is `collection` 
+         filter: '{"product_partNumber": "PS-SL-KIT"}'
+         limit: 5
+         field_mapping:
+            title: title
+            body: text
+            url: some-url
+See all 25 lines
+​
+OpenSearch
+To connect to an OpenSearch knowledge base, configure the required url and index. You can also set optional fields like port, text_field, vector_field, embedding_mode, embedding_model_id, search_mode, query_body, result_filter, and field_mapping.
+
+YAML
+
+JSON
+spec_version: v1
+kind: knowledge_base
+name: os_kb_hybrid_server_default_pipeline_default_model
+description: are there monthly maintenance fees?
+vector_index:
+  embeddings_model_name: ibm/slate-125m-english-rtrvr-v2
+  chunk_size: 400
+  chunk_overlap: 50
+  extraction_strategy: standard
+conversational_search_tool:
+  language: en
+  index_config:
+  - open_search:
+      url: https://search-wo-opensearch-dev-byo-klgika4kflruyuzps5l2a3onbq.us-east-1.es.amazonaws.com
+      index: index-hybrid-server-default-pipeline-default-model
+      port: '443'
+      search_mode: hybrid
+      embedding_mode: server
+      vector_field: passage_embedding
+      text_field: passage_text
+      field_mapping:
+        title: title
+        body: passage_text
+prioritize_built_in_index: false
+representation: tool
+See all 25 lines
+​
+Configuring generation options
+With the ADK, you can further fine-tune how your agent uses knowledge through the conversational_search_tool configuration in your knowledge base.
+You can apply these settings to both built-in Milvus knowledge bases and external knowledge bases. Below are the configurable options available within the conversational_search_tool section:
+Parameter	Description
+prompt_instruction	Set this under generation. If specified, this instruction will be included in the prompt sent to the language model to guide response generation.
+max_docs_passed_to_llm	Set this under generation. If specified, define the maximum number of documents passed to the LLM. This field accepts values from 1 to 20.
+generated_response_length	Set this under generation to one of Concise, Moderate or Verbose. This setting adjusts the prompt to request responses of the specified length. If not set, the default is Moderate.
+idk_message	Set this under generation. Defines the fallback message sent to the user when the knowledge base cannot provide an answer.
+retrieval_confidence_threshold	Set this under confidence_thresholds to one of Off, Lowest, Low, High or Highest. This threshold determines the minimum confidence required that the retrieved documents answer the user’s query. If the confidence is below the threshold, the agent will return a default “I don’t know” response instead of generating a response. The default is “Low”.
+response_confidence_threshold	Set this under confidence_thresholds to one of Off, Lowest, Low, High or Highest. This threshold evaluates the confidence that both the generated response and the retrieved documents answer the user’s query. If the confidence is below the threshold, the agent will return a default “I don’t know” response. The default is Low.
+query_rewrite	If enabled, the user’s query is rewritten using the context of the conversation to support multi-turn interactions. This setting is enabled by default.
+citations_shown	Set this under citations. Use the citations_shown parameter to control how many citations appear during the interaction. Set a specific number to define the maximum citations displayed. Use 0 to hide all citations, or -1 to show every available citation. If not set, the default is -1, which means all available citations will be displayed
+Note: In dynamic knowledge bases, only the max_docs_passed_to_llm and citations_shown parameters apply. All other settings are ignored.
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+kind: knowledge_base 
+name: knowledge_base_name
+description: |
+   A description of what information this knowledge base addresses
+documents:
+   - "/file-path-1.pdf"
+   - "relative-path/file-path-2.pdf"
+conversational_search_tool:
+   generation:
+      prompt_instruction: Custom instruction
+      max_docs_passed_to_llm: 10
+      generated_response_length: Moderate
+      idk_message: I'm sorry, I don't have enough information to answer that right now. Could you please rephrase or provide more details?
+   confidence_thresholds:
+      retrieval_confidence_threshold: Low
+      response_confidence_threshold: Low
+   query_rewrite:
+      enabled: True
+   citations:
+      citations_shown: -1
+See all 21 lines
+​
+Configuring dynamic knowledge bases (Public preview)
+This feature is currently in public preview. Functionality and behavior may change in future updates.
+By default, classic knowledge base is used as a linear pipeline that retrieves information from whatever content store it is connected to. It takes the user’s input and the conversation context to create a query against that store and then generates an answer which is sent back to the agent.
+Enabling dynamic mode allows knowledge base to retrieve information as before, but the agent decides how to use it. The agent may generate an answer or use the retrieved information as context to complete tasks. In addition, the agent can be configured to create a query against the content store.
+To configure a dynamic knowledge base, update your configuration file with the following parameters in the conversational_search_tool schema:
+Parameter	Description
+query_source	Defines the query source. Accepted values:
+Agent: Enables dynamic mode. The agent provides the query.
+SessionHistory: Uses classic mode. The knowledge base generates the query using user input and conversation context. If you don’t configure query_source, this is the default mode.
+generation	In the generation schema, set the enabled parameter to false to activate dynamic mode.
+Example:
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+kind: knowledge_base
+name: ibm_knowledge_base_dynamic_mode
+description: General information about IBM and its history
+documents:
+ - path: IBM_wikipedia.pdf
+   url: https://en.wikipedia.org/wiki/IBM
+ - path: history_of_ibm.pdf
+   url: https://en.wikipedia.org/wiki/History_of_IBM
+conversational_search_tool:
+  query_source: Agent
+  generation:
+    enabled: False
+See all 13 lines
+
+Importing knowledge bases
+The orchestrate knowledge-bases import command enables you to import the knowledge bases that you create in your active environment. To import a knowledge base, run this command in the ADK CLI and set the path of the file that contains your knowledge base configurations.
+BASH
+orchestrate knowledge-bases import -f <knowledge-base-file-path>
+​
+Connecting to external knowledge base providers
+In some cases, to connect to external knowledge base providers, such as Milvus or Elasticsearch, you must provide credentials to authenticate to these services.
+To do that, you must create a new connection and provide the connection in the command by using the --app-id or -a flag.
+BASH
+orchestrate connections add -a <my_credentials> --component knowledge --category <category>
+orchestrate connections configure -a <my_credentials> --env draft --kind basic --type team
+orchestrate connections set-credentials -a <my_credentials> --env draft -u <username> -p <password>
+orchestrate knowledge-bases import -f <my_knowledge_base_file> -a <my_credentials>
+If your service requires a different type of authentication, see Connections for more authentication options.
+Managing knowledge bases
+Manage the knowledge bases in your active environment.
+​
+Getting knowledge base status
+To get the status of an existing knowledge base, run the following command. For built-in knowledge bases, this will include a Ready property, which denotes whether your index has been successfully created and the knowledge base is ready to use:
+BASH
+orchestrate knowledge-bases status --name my-base-name
+​
+Updating knowledge base
+To update a knowledge base, run the import command again using the same knowledge base name as the knowledge base you want to update.
+BASH
+orchestrate knowledge-bases import -f <path to knowledge base file that you want to update>
+​
+Removing knowledge base
+To remove an existing knowledge base, run the following command:
+BASH
+orchestrate knowledge-bases remove --name my-base-name
+​
+Listing knowledge bases
+To list all knowledge bases, run the following command:
+BASH
+orchestrate knowledge-bases list
+​
+Exporting knowledge bases
+Use the orchestrate knowledge-bases export command to export a knowledge base specification file YAML configuration from your active environment.
+BASH
+orchestrate knowledge-bases export -n <knowledge-base-name> -o <output-path>.yaml

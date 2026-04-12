@@ -89,8 +89,8 @@ AGENT_FILES=(
   routing_pivt.yaml
   facility_pivt.yaml
   optimizing_pivt.yaml
-  cost_pivt.yaml
   driver_pivt.yaml
+  disaster_management_pivt.yaml
   eis_orchestrator.yaml
 )
 
@@ -101,5 +101,5 @@ done
 
 echo "Done. Active environment: ${ENV_NAME}"
 echo "Tip: export APP_BASE_URL=http://127.0.0.1:3000 when your Next.js dev server is running so tools resolve live data."
-echo "Tip: export REDIS_URL=redis://127.0.0.1:6379 (and run Docker Redis) so redis_memory_* tools persist agent state."
-echo "Tip: export TAVILY_API_KEY for tavily_search (web context). Import MCP toolkit in Orchestrate UI per docs, or use this Python tool."
+echo "Tip: export REDIS_URL for redis_memory_* tools (local: redis://127.0.0.1:6379; Redis Cloud: redis://default:SECRET@host:port — use rediss:// if your provider requires TLS). Never commit secrets; use .env.local (sourced above)."
+echo "Tip: export TAVILY_API_KEY for tavily_search (web context). Import Tavily MCP on **EIS Orchestrator** (or Disaster Management Pivt) in Orchestrate UI if you want web search there."

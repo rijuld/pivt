@@ -1,0 +1,548 @@
+Choosing your LLM
+When you create an agent, the choice of LLM determines how effectively the agent can complete your workflow. The SaaS and Developer Edition variants of the watsonx Orchestrate platform include all LLM chat models available within watsonx.ai and Groq. These models are provided as part of your entitlement [1].
+​
+Available Models
+Model	Description
+★ groq/openai/gpt-oss-120b	gpt-oss-120b is a Groq model optimized for high-speed inference and tool calling, designed for multilingual and system-prompt flexibility.
+★ watsonx/meta-llama/llama-3-2-90b-vision-instruct	Llama-3-2-90b-vision-instruct is an auto-regressive language model that uses an optimized transformer architecture.
+★ watsonx/meta-llama/llama-3-405b-instruct	Llama-3-405b-instruct is Meta’s largest open-sourced foundation model to date, with 405 billion parameters, optimized for dialogue use cases.
+Note:
+GPT-OSS models require special considerations. For more information, see Special considerations.
+If you’re migrating from Llama to GPT-OSS-120B, see the Migration guide for step-by-step instructions and best practices.
+watsonx/meta-llama/llama-3-405b-instruct is not available in AWS GovCloud.
+GPT-OSS-120b is a non-IBM product governed by a third-party license that may impose use restrictions and other obligations. By using this model you agree to the terms. Read the terms.
+GPT-OSS-120b provided by Groq is not available in AWS GovCloud.
+​
+Preferred Models
+While all models are available, only a subset is marked as preferred. Preferred models appear with a ★ next to their name when you run the orchestrate models list command. In the UI, only preferred models are shown as supported on the Manage Agents page.
+Preferred models have undergone evaluation and are optimized for use with the watsonx Orchestrate platform. On-premises models hosted through watsonx.ai Inference Foundation Models (IFM) within watsonx Orchestrate also appear in this list.
+Groq models, such as groq/openai/gpt-oss-120b, can be enabled locally by setting the GROQ_API_KEY in the .env file.
+​
+AI Gateway
+​
+virtual-models
+The watsonx Orchestrate platform includes the AI Gateway, which lets you expose models from your preferred provider to watsonx Orchestrate.
+These models can be added to watsonx Orchestrate via the ADK and will be automatically made available to all users of the watsonx Orchestrate platform. [2]
+While it may be possible to add any model in this way, only models that support tool calling will work with watsonx Orchestrate.
+Models added via the AI Gateway are not validated for compatibility with watsonx Orchestrate, unlike the preferred models from watsonx.ai.
+Using a virtual model may incur additional costs from the upstream provider.
+​
+virtual-policies
+In addition to adding models, you can configure complex routing rules for your LLMs. Use virtual-policies to establish pseudo-LLM names that can load balance traffic between models or establish fallback policies for when a provider is experiencing an outage.
+[1] In the Developer Edition of watsonx Orchestrate, when a WO_INSTANCE and WO_API_KEY are provided in the user’s .env file, if that instance is a SaaS instance, all LLM requests will be proxied through watsonx Orchestrate without the user needing an additional watsonx.ai entitlement.
+If the instance is CPD and a WO_INSTANCE and WO_API_KEY are provided, only models deployed via IFM will be available via the watsonx/ prefix.
+If neither of the above apply, either provide a WATSONX_SPACE_ID and WATSONX_APIKEY to a watsonx.ai account hosted in us-south, or add a model to the AI Gateway running within your local Developer Edition server.
+[2] virtual-models and virtual-policies added to a SaaS or CPD instance of watsonx Orchestrate will not automatically be available within the Developer Edition. They will need to be manually added by the user.
+​
+Next steps
+Migrating to GPT-OSS-120B
+Step-by-step guide for migrating agents from Llama to GPT-OSS-120B with optimization tips.
+Managing the AI gateway
+Learn how to manage your AI Gateway LLMs by using the ADK’s CLI.
+Model policies
+Learn how to create and manage model policies for complex LLM routing and fallback.
+Examples with supported providers
+See how to add OpenAI, Azure, AWS Bedrock, Ollama, and many more models from different providers.
+Integrate the Developer Edition with SaaS
+Learn how to integrate the watsonx Orchestrate Developer Edition with your watsonx Orchestrate SaaS tenant for LLM inferencing.
+Managing agents
+Previous
+
+Migrating agents from Llama to GPT-OSS-120B
+This guide helps you migrate existing agents from llama-3.2-90B-vision-instruct to gpt-oss-120b. Based on extensive testing across 256 production agents, GPT-OSS-120B delivers superior performance in response time, error handling, conversational quality, and user experience when properly configured.
+​
+Why migrate to GPT-OSS-120B
+GPT-OSS-120B offers significant advantages over Llama models:
+Faster response times across all scenarios
+Superior error handling with intelligent recovery and detailed explanations
+Enhanced conversational efficiency through single-turn parameter collection
+Better memory and context retention across multi-turn dialogues
+Improved safety with robust out-of-scope request handling
+More natural interactions that feel less robotic
+​
+Before you begin
+​
+Prerequisites
+Access to watsonx Orchestrate (SaaS or Developer Edition)
+Existing agents built with Llama models
+Familiarity with agent configuration and prompt engineering
+​
+Understanding the differences
+GPT-OSS-120B behaves differently from Llama models in several key ways:
+Aspect	Llama 3.2 90B	GPT-OSS-120B
+System prompt	Uses standard watsonx Orchestrate system prompt	Does not use standard system prompt
+Knowledge preference	Balanced between internal and external knowledge	Prefers internal knowledge unless instructed otherwise
+Parameter collection	Turn-by-turn questioning	Single-turn collection of multiple parameters
+Error communication	Generic error messages	Context-aware, detailed explanations
+Instruction following	Flexible interpretation	Literal, precise following of examples
+Reasoning approach	Concise execution	More exploratory with additional tool calls
+​
+Migration process
+1
+Review your agent configuration
+
+Export your existing Llama-based agent to review its configuration:
+orchestrate agents export -n <agent-name> -k native -o agent-backup.zip
+Document the following elements:
+Agent instructions and tone
+Tool usage patterns
+Knowledge base dependencies
+Expected user interaction flows
+2
+Update the LLM configuration
+
+Modify your agent configuration to use GPT-OSS-120B:
+
+YAML
+
+JSON
+
+Python
+llm: groq/openai/gpt-oss-120b
+3
+Optimize agent instructions
+
+GPT-OSS-120B requires explicit, model-specific instructions. Add the following blocks to your agent’s instructions based on your needs:
+​
+Essential instruction template
+Use this comprehensive template as a starting point:
+Behavior and sources:
+- Identify as an agent operating within watsonx Orchestrate.
+- Always use available tools to retrieve information before relying on your internal knowledge.
+- If tools don't contain the answer, state "The available tools don't contain the answer" and ask one clarifying question.
+
+Reasoning and brevity controls:
+- Use concise reasoning with at most 3 reasoning steps before responding.
+- Keep chit-chat to one sentence, then proceed.
+- Limit final answers to ≤150 words unless the user requests detail.
+
+Error handling:
+- If required inputs are missing, ask for the minimum missing fields in a single question.
+- When errors occur, explain what went wrong and suggest next steps.
+
+Formatting:
+- Use proper Markdown syntax for hyperlinks: [link text](url)
+- Format responses clearly with appropriate structure.
+​
+Prioritize knowledge bases (if applicable)
+If your agent uses knowledge bases, add this instruction:
+Always check the connected knowledge base(s) first.
+Prefer information retrieved from knowledge over your
+own internal knowledge. If relevant content is found,
+summarize it faithfully and cite the source title or document
+name. If the knowledge base does not contain the answer, say
+"I don't know based on the provided knowledge" and ask
+a clarifying question.
+​
+Optimize tool usage
+For agents with multiple tools, provide clear guidance:
+Tool usage rules:
+- Use the [tool_name] tool for [specific purpose].
+- Call tools with all available information; don't ask for parameters you can infer.
+- If a tool returns an error, analyze the error message and retry with corrections.
+- If a tool fails after 2 attempts, inform the user and suggest alternatives.
+​
+Control agent routing (for supervisor agents)
+If your agent delegates to other agents, use explicit action verbs:
+Agent delegation:
+- Call the [agent_name] agent when [specific condition].
+- Execute the agent call immediately with available information.
+- Do NOT ask for additional parameters before calling the agent unless absolutely required.
+4
+Remove problematic patterns
+
+GPT-OSS-120B can be constrained by overly specific examples. Review and update:
+❌ Avoid:
+When updating employee data, ask for:
+1. Employee name
+2. Department
+3. Location
+Then call the update_employee tool.
+✅ Prefer:
+When updating employee data, collect all required parameters
+(name, department, location) in a single question, then call
+the update_employee tool.
+❌ Avoid:
+If the user asks about weather, say "I cannot help with that."
+If they ask about sports, say "That's outside my scope."
+If they ask about news, say "I don't have access to that."
+✅ Prefer:
+If the user asks about topics outside your capabilities,
+politely acknowledge the request and redirect to your
+primary function.
+5
+Test and validate
+
+After updating your agent configuration:
+Test basic interactions:
+orchestrate chat ask --agent-name <agent-name> "Hello"
+Test tool calling: Verify that tools are called correctly with appropriate parameters.
+Test error scenarios: Ensure error messages are clear and recovery is intelligent.
+Test multi-turn conversations: Confirm context retention across multiple exchanges.
+Test edge cases: Validate behavior with incomplete information, out-of-scope requests, and ambiguous queries.
+6
+Deploy and monitor
+
+Import your updated agent:
+orchestrate agents import -f updated-agent.yaml
+Monitor initial usage for:
+Response quality and accuracy
+Tool call precision
+User satisfaction
+Error rates and recovery success
+​
+Common migration challenges
+​
+Challenge 1: Over-reliance on internal knowledge
+Symptom: Agent provides answers from its training data instead of using tools or knowledge bases.
+Solution: Add explicit knowledge prioritization instructions (see Step 3).
+​
+Challenge 2: Excessive parameter collection
+Symptom: Agent asks for parameters before routing to specialized agents or calling tools.
+Solution: Use strong negations in instructions:
+Do NOT ask for [parameter_name] before calling [tool/agent].
+Call immediately with available information.
+​
+Challenge 3: Literal example following
+Symptom: Agent only handles scenarios exactly as shown in examples.
+Solution: Remove specific examples and use generic patterns instead.
+​
+Challenge 4: Tool call precision issues
+Symptom: Agent makes irrelevant tool calls or misses required calls.
+Solution:
+Improve tool descriptions with clear use cases
+Add explicit tool usage rules in instructions
+Test iteratively and refine based on results
+​
+Challenge 5: Agent routing confusion
+Symptom: Agent returns JSON instead of executing agent calls.
+Solution: Change from implicit to explicit instructions:
+❌ "Delegate to the appropriate agent"
+✅ "Call the [agent_name] agent with the information you have"
+​
+Prompt engineering best practices
+​
+DO:
+✅ Use explicit action verbs (“Call”, “Execute”, “Use”)
+✅ Provide strong negations for unwanted behaviors
+✅ Keep examples generic and minimal
+✅ Trust the model’s reasoning capabilities
+✅ Leverage single-turn parameter collection
+✅ Test iteratively with real scenarios
+​
+DON’T:
+❌ Rely on implicit instructions (“delegate”, “route”)
+❌ Provide overly specific examples that constrain behavior
+❌ List exhaustive value options (agent may limit itself)
+❌ Use weak negations for critical constraints
+❌ Force turn-by-turn parameter collection
+❌ Over-constrain conversational patterns
+​
+Performance optimization tips
+​
+Reduce response latency
+Reasoning efficiency:
+- Limit yourself to 3 reasoning steps maximum.
+- Do not re-plan unless the last tool result contradicts prior assumptions.
+- If you cannot progress after 3 steps, ask one focused question.
+​
+Improve conversational flow
+Conversation style:
+- Collect multiple related parameters in a single question.
+- Avoid asking for information you can reasonably infer.
+- Keep responses concise and action-oriented.
+​
+Enhance error recovery
+Error handling strategy:
+- When a tool fails, analyze the error message carefully.
+- Retry with intelligent corrections based on the error.
+- After 2 failed attempts, explain the issue and suggest alternatives.
+- Extract useful information from partial failures when possible.
+​
+Validation checklist
+Before considering your migration complete, verify:
+ Agent uses groq/openai/gpt-oss-120b as the LLM
+ Instructions include model-specific optimizations
+ Knowledge base prioritization is configured (if applicable)
+ Tool usage rules are explicit and clear
+ Agent routing uses explicit action verbs (if applicable)
+ Overly specific examples have been removed
+ Basic interactions work as expected
+ Tool calling is accurate and efficient
+ Error handling is clear and helpful
+ Multi-turn conversations maintain context
+ Edge cases are handled gracefully
+​
+Troubleshooting
+Agent is too verbose
+
+Agent ignores knowledge bases
+
+Agent makes too many tool calls
+
+Agent doesn't follow instructions
+
+​
+Next steps
+Managing agents
+Learn how to update, export, and manage your migrated agents.
+Agent descriptions and instructions
+Deep dive into writing effective instructions for GPT-OSS-120B.
+Managing custom LLMs
+Explore advanced LLM configuration options.
+Model policies
+Set up fallback policies and load balancing for production resilience.
+​
+Managing custom LLMs with the AI gateway
+You can integrate third-party LLM models from a variety of supported providers through the AI Gateway system. The gateway also supports the configuration of routing policies, enabling use cases such as load balancing and fallback across multiple models.
+​
+Supported providers
+Provider	Provider ID
+OpenAI	openai
+watsonx.ai	watsonx
+Groq	groq
+Anthropic	anthropic
+Google	google
+Azure AI	azure-ai
+Azure OpenAI	azure-openai
+AWS Bedrock	bedrock
+Mistral	mistral-ai
+OpenRouter	openrouter
+x.ai	x-ai
+Ollama	ollama
+Note:
+When importing a model from OpenRouter, always set the max_token parameter explicitly. If you skip this step, the system defaults to 65536 tokens. This high token count can cause the request to fail if you don’t have enough credits.
+GPT-OSS-120b is a non-IBM product governed by a third-party license that may impose use restrictions and other obligations. By using this model you agree to the terms. Read the terms.
+​
+CLI Reference
+Importing from a file
+Using the CLI only
+You can add a model to the watsonx Orchestrate AI gateway using the orchestrate models import command.
+1
+Define the model specification file
+
+granite-3-3-8b-model.yaml
+spec_version: v1
+kind: model
+name: virtual-model/watsonx/ibm/granite-3.3-8b-instruct
+display_name: IBM watsonx.ai (Granite)
+description: |
+IBM watsonx.ai model using Space-scoped configuration.
+tags:
+- ibm
+- watsonx
+model_type: chat
+provider_config:
+    watsonx_space_id: my-space-id # For any non-sensitive field not already provided by the connection
+Show properties
+
+2
+Create an API key connection
+
+BASH
+orchestrate connections add -a watsonx_credentials
+orchestrate connections configure -a watsonx_credentials --env draft -k key_value -t team
+orchestrate connections set-credentials -a watsonx_credentials --env draft -e "api_key=my_watsonx_api_key"
+3
+Add the model
+
+BASH
+orchestrate models import --file watsonx-model.yaml --app-id watsonx_credentials
+Arguments:
+--file (-f): File path of the spec file containing the model configuration.
+--app-id (-a): The app ID of a key_value connection containing provider configuration details. These will be merged with the values provided in the provider_config section of the spec.
+​
+Examples using the supported providers
+The following sections contain examples and the supported schemas for each model provider.
+OpenAI
+
+watsonx.ai
+
+Groq
+
+Anthropic
+
+Google
+
+Azure
+
+Azure OpenAI
+
+AWS Bedrock
+
+Mistral
+
+OpenRouter
+
+x.ai
+
+Ollama
+
+​
+List all LLMs
+Run the orchestrate models list command to see all available LLMs in your active environment.
+BASH
+orchestrate models list
+Note:
+By default, you see a table of available models. If you prefer raw output, add the --raw (-r) flag.
+​
+Removing custom LLMs
+Run the orchestrate models remove command and use the --name (-n) flag to specify the LLM you want to remove.
+BASH
+orchestrate models remove -n <model-name-unique-identifier-to-delete>
+​
+Exporting custom LLM
+Run the orchestrate models export command to export LLMs in your active environment.
+BASH
+orchestrate models export -n <model_name> -o <path>.zip
+Show command flags
+
+​
+Updating custom LLM
+To update a custom LLM, first remove it, then add it again:
+BASH
+orchestrate models remove -n <model-name-unique-identifier-to-delete>
+orchestrate models add --name watsonx/meta-llama/llama-3-2-90b-vision-instruct --app-id watsonx_ai_creds
+​
+Additional configuration options
+​
+Setting a default LLM in the UI
+If you use an on-premises installation with models provisioned only through the AI gateway, you can choose which model appears as the default in the user interface. To do this, add the default tag under the tags section of a model with the type set to chat.
+granite-default-model.yaml
+spec_version: v1
+kind: model
+name: watsonx/ibm/granite-3.3-8b-instruct
+display_name: IBM watsonx.ai (Granite)
+description: |
+    IBM watsonx.ai model using Space-scoped configuration.
+tags:
+- default # <-- this marks this as the Default model in the ui dropdown
+model_type: chat
+provider_config:
+    watsonx_space_id: my-space-id
+See all 11 lines
+Note:
+For on-premises installations using only externally hosted virtual-models, at least one model must be specified as the default model or it will not be possible to open the “Create Agent” page in the UI.
+​
+Setting a default embedding model
+If you use an on-premises installation with models provisioned only through the AI gateway, you can also set a default model for knowledge bases. To do this, add the default tag under the tags section of a model with the type set to embedding.
+virtual-model.yaml
+spec_version: v1
+kind: model
+name: virtual-model/watsonx/ibm/slate-30m-english-rtrvr-v2
+display_name: slate30m
+tags:
+  - default
+model_type: embedding
+provider_config:
+  watsonx_space_id: xxx
+  customHost: 'https://us-south.ml.cloud.ibm.com'
+  api_key: xxx
+See all 11 lines
+​
+Registering a watsonx model by using your watsonx credentials
+You can also register a watsonx model that uses your watsonx credentials supplied in your .env file when you start the watsonx Orchestrate Developer Edition.
+For that, your .env file must contain either:
+Your watsonx.ai credentials with the WATSONX_APIKEY and WATSONX_SPACE_ID environment variables.
+Or, your watsonx Orchestrate credentials with the WO_INSTANCE and WO_API_KEY environment variables.
+To learn how to configure you .env file with these credentials, see Installing the watsonx Orchestrate Developer Edition.
+To register the watsonx model using this method, set the api_key credential value to “gateway”. You do not need to specify a space_id when you add the model. See the following example:
+Note:
+This requirement does not apply to on-premises deployments.
+BASH
+orchestrate connections configure -a wx_gw_creds --env draft -k key_value -t team
+orchestrate connections set-credentials -a wx_gw_creds --env draft -e "api_key=gateway"
+orchestrate models add --name "watsonx/meta-llama/llama-3-2-90b-vision-instruct"  --app-id wx_gw_creds
+Configuring model policies (Public preview)
+Model policies allow for the coordination of multiple models to accomplish tasks like load-balancing and fallback.
+​
+Adding model policies
+BASH
+orchestrate models policy add --name <model_name> --model <provider1>/<model_id1> --model <provider2>/<model_id2> --strategy <strategy_type> --strategy-on-code 500 --retry-on-code 503 --retry-attempts 3
+Show command flags
+
+​
+Importing model policies
+BASH
+orchestrate models policy import --file my_spec.yaml
+After you create a model policy, assign the policy to your agent by using the ADK and the agent YAML file. Assign the policy the same way that you assign a regular model. You cannot assign a model policy to a Generative Prompt Activity in a flow.
+Where the my_spec.yaml file follows this structure:
+Load balancing
+Fallback
+Single
+[my_spec.yaml]
+spec_version: v1
+kind: model
+name: anygem
+description: Balances requests between 2 Gemini models
+display_name: Any Gem
+policy:
+  strategy:
+    mode: loadbalance
+    on_status_codes: [503, 504]
+  retry:
+    attempts: 1
+  targets:
+    - model_name: virtual-model/google/gemini-2.0-flash
+      weight: 0.75   # Weights must be greater than 0 and less than or equal to 1
+    - model_name: virtual-model/google/gemini-2.0-flash-lite
+      weight: 0.25
+Flags:
+--file (-f): File path of the spec file containing the model policy configuration.
+​
+Updating model policy
+Use either the add or import commands with the name of the model policy that you want to update to update the model policy.
+​
+Exporting model policy
+BASH
+orchestrate models policy export -n <model_name> -o <path>.zip
+Show command flags
+
+​
+Removing model policies
+BASH
+orchestrate models policy remove -n <name of policy>
+Show command flags
+
+Managing custom LLMs with the AI gateway
+Previous
+
+Enabling watsonx/* LLMs
+The watsonx Orchestrate Developer Edition now supports integration with the wxO SaaS tenant for LLM inferencing. Previously, developers were required to configure the Developer Edition using their own watsonx.ai API key and Space ID. This update simplifies the setup process by enabling proxy usage through Watsonx Orchestrate.
+​
+Prerequisites
+To retrieve the necessary configuration details, you must have access to an instance of watsonx Orchestrate.
+​
+Environment Configuration
+Additional environment variables are required to enable proxy usage. These variables differ based on the deployment type:
+SaaS Deployment
+On-premises Deployment
+​
+Common Parameters
+Variable	Description
+AUTHORIZATION_URL	IAM URL used to authorize watsonx Orchestrate to access the proxy service.
+USE_SAAS_ML_TOOLS_RUNTIME	Enables the ADK to use the proxy.
+​
+SaaS Deployment Configuration
+For SaaS deployments, use the following environment variables:
+WO_API_KEY=<your API key for Watson Orchestrate on SaaS>
+WO_INSTANCE=<your service instance URL>
+# The below two fields are optional and automatically inferred by the Developer Edition
+AUTHORIZATION_URL=<your IAM URL>
+USE_SAAS_ML_TOOLS_RUNTIME=True
+Note:
+watsonx.ai API Key and Space ID are no longer required.
+​
+On-premises Deployment Configuration
+For on-premises deployments, use the following environment variables:
+authenticating with password
+authenticating with API key
+WO_USERNAME=<your username for onprem>
+WO_PASSWORD=<your password for onprem>
+WO_INSTANCE=<your service instance URL>
+AUTHORIZATION_URL=<your IAM URL>
+Variable	Description
+WO_USERNAME	Username used to log in to IBM SoftwareHub.
+WO_PASSWORD	Password associated with WO_USERNAME.
+WO_INSTANCE	watsonx Orchestrate server instance URL
+AUTHORIZATION_URL	Optional, an IAM URL used to authorize watsonx Orchestrate to access the proxy service.

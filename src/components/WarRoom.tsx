@@ -6,7 +6,10 @@ import { WarRoomSidebar } from "./WarRoomSidebar";
 import { MainWorkspace } from "./MainWorkspace";
 import type { MapPhase, ScenarioKind } from "@/lib/constants";
 import type { CompanyProfile } from "@/lib/company-profile";
-import type { ActiveShipment } from "@/lib/shipments";
+import {
+  sortFleetByWeatherAttention,
+  type ActiveShipment,
+} from "@/lib/shipments";
 import {
   welcomeStepForShipment,
   type ResolutionOutput,
@@ -28,7 +31,17 @@ export default function WarRoom() {
   const [selectedShipmentId, setSelectedShipmentId] = useState<string | null>(
     null,
   );
-  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTabId>("overview");
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTabId>("weather");
+
+  /** Shipment IDs with NWS corridor hits — from SQLite snapshot via ``/api/weather-snapshot``. */
+  const [weatherAttentionIds, setWeatherAttentionIds] = useState<string[]>(
+    [],
+  );
+
+  /** Cleared when all Response flow agents have succeeded for that load (see CRM board). */
+  const [attentionFlowResolvedIds, setAttentionFlowResolvedIds] = useState<
+    string[]
+  >([]);
 
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(
     null,
@@ -54,6 +67,22 @@ export default function WarRoom() {
     setWorkspaceTab("overview");
   }, []);
 
+  const loadWeatherSnapshot = useCallback(async () => {
+    try {
+      const res = await fetch("/api/weather-snapshot");
+      const json = (await res.json()) as {
+        hits?: { shipmentId: string }[];
+      };
+      const ids: string[] = [];
+      for (const h of json.hits ?? []) {
+        if (h.shipmentId) ids.push(h.shipmentId);
+      }
+      setWeatherAttentionIds(ids);
+    } catch {
+      setWeatherAttentionIds([]);
+    }
+  }, []);
+
   const refreshFleet = useCallback(async () => {
     try {
       const res = await fetch("/api/ships");
@@ -77,9 +106,30 @@ export default function WarRoom() {
     void refreshFleet();
   }, [refreshFleet]);
 
+  const fleetIdKey = fleet
+    .map((s) => s.id)
+    .sort()
+    .join(",");
+  useEffect(() => {
+    void loadWeatherSnapshot();
+  }, [fleetIdKey, loadWeatherSnapshot]);
+
+  useEffect(() => {
+    const allowed = new Set(weatherAttentionIds);
+    setAttentionFlowResolvedIds((prev) =>
+      prev.filter((id) => allowed.has(id)),
+    );
+  }, [weatherAttentionIds]);
+
   useEffect(() => {
     void refreshProfile();
   }, [refreshProfile]);
+
+  const markAttentionFlowResolved = useCallback((shipmentId: string) => {
+    setAttentionFlowResolvedIds((prev) =>
+      prev.includes(shipmentId) ? prev : [...prev, shipmentId],
+    );
+  }, []);
 
   useEffect(() => {
     if (fleet.length === 0) {
@@ -88,10 +138,10 @@ export default function WarRoom() {
     }
     setSelectedShipmentId((prev) => {
       if (prev && fleet.some((s) => s.id === prev)) return prev;
-      const primary = fleet.find((s) => s.isPrimary);
-      return primary?.id ?? fleet[0].id;
+      const sorted = sortFleetByWeatherAttention(fleet, weatherAttentionIds);
+      return sorted[0]?.id ?? null;
     });
-  }, [fleet]);
+  }, [fleet, weatherAttentionIds]);
 
   useEffect(() => {
     setMessagesByShipment((prev) => {
@@ -131,6 +181,8 @@ export default function WarRoom() {
           companyProfile={companyProfile}
           profileLoading={profileLoading}
           onEditProfile={() => setProfileModalOpen(true)}
+          weatherAttentionShipmentIds={weatherAttentionIds}
+          attentionFlowResolvedShipmentIds={attentionFlowResolvedIds}
         />
       </aside>
       <MainWorkspace
@@ -144,6 +196,11 @@ export default function WarRoom() {
         onSelectShipment={selectShipment}
         workspaceTab={workspaceTab}
         onWorkspaceTabChange={setWorkspaceTab}
+        weatherAttentionShipmentIds={weatherAttentionIds}
+        attentionFlowResolvedShipmentIds={attentionFlowResolvedIds}
+        onAttentionFlowResolved={markAttentionFlowResolved}
+        onWeatherDataRefresh={loadWeatherSnapshot}
+        onRefreshFleet={refreshFleet}
       />
       <CompanyProfileModal
         open={profileModalOpen}

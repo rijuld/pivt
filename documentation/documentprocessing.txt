@@ -1,0 +1,798 @@
+Document field extractor node (Public preview)
+Use the document field extractor node to extract specific fields from your documents.
+​
+Pre-requisites
+Run the following command to enable watsonx Orchestrate Developer Edition to process documents:
+BASH
+orchestrate server start -e <.env file path> -d
+Note: You need to configure a minimum allocation of 20GB RAM to your Docker engine during installation of watsonx Orchestrate Developer edition to support document processing features.
+Note: To run the document field extractor, you must define the WATSONX_SPACE_ID, WATSONX_APIKEY, and WATSONX_PROJECT_ID credentials in your .env file. For more information on configuring the .env file, see Installing the watsonx Orchestrate Developer Edition.
+​
+Configuring document extractor node in agentic workflows
+Define the fields to extract. Create a class that defines the fields you want to extract. Each field must follow this structure:
+Python
+field: DocExtConfigField = Field(name="Field name", default=DocExtConfigField(name="Field name", field_name="field_name"))
+Class example:
+Python
+class Fields(BaseModel):
+    """
+    Configuration schema for document extraction fields.
+    
+    Defines the fields to be extracted from contract documents, including
+    their names, types, and descriptions. Each field is configured with
+    a DocExtConfigField that specifies how the document extractor should
+    identify and extract the information.
+    
+    In this example, we define a number of custom fields for a Contract or 
+    Agreement document:
+        buyer: The purchasing party in the contract
+        seller: The selling party in the contract
+        agreement_date: The date when the agreement was signed (date type)
+        agreement_number: Unique identifier for the contract
+        contract_type: Classification of the contract 
+    """
+    buyer: DocExtConfigField = Field(
+        name="Buyer",
+        default=DocExtConfigField(
+            name="Buyer",
+            field_name="buyer"
+        )
+    )
+See all 24 lines
+Configure the document extract node
+In your agentic workflow, include a call to the docext() method to extract an field from a document. This method accepts the following input arguments:
+​
+name
+stringrequired
+Unique identifier for the node.
+​
+llm
+stringrequired
+The LLM used for field extraction. The default value is groq/openai/gpt-oss-120b.
+​
+display_name
+string
+Display name for the node.
+​
+fields
+objectrequired
+The fields you want to extract.
+​
+description
+string
+Description of the node.
+​
+input_map
+DataMap
+Define input mappings using a structured collection of Assignment objects.
+​
+enable_hw
+bool
+Enable the handwritten feature by setting this to true.
+​
+min_confidence
+float
+The minimum acceptable confidence for an extracted field value.
+​
+review_fields
+List[string]
+The fields that require user review.
+​
+enable_review
+bool
+Enables or disables the human-in-the-loop feature. Set to True to activate it and False to deactivate. The default value is False.
+​
+field_extraction_method
+string
+Selects the Document Extractor runtime. The default value is classic, which uses the Unstructured Document Extractor. To use the Structured Document Extractor, set the value to layout.
+Note:
+The min_confidence and review_fields settings control the human-in-the-loop feature. This feature only works when you run the Flow from a chat session. If a field is extracted with confidence lower than min_confidence, and its name appears in review_fields, the agent opens a review window in the chat. You can then review and confirm the extracted values.
+The input to a docext node is expected to be of type DocExtInput, from the module ibm_watsonx_orchestrate.flow_builder.types.
+Example use of the docext node in an agentic workflow:
+Python
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import (
+    Flow, flow, START, END
+)
+from ibm_watsonx_orchestrate.flow_builder.types import DocExtConfigField, DocumentProcessingCommonInput
+
+
+class Fields(BaseModel):
+    """
+    Configuration schema for document extraction fields.
+    
+    Defines the fields to be extracted from contract documents, including
+    their names, types, and descriptions. Each field is configured with
+    a DocExtConfigField that specifies how the document extractor should
+    identify and extract the information.
+    
+    In this example, we define a number of custom fields for a Contract or 
+    Agreement document:
+        buyer: The purchasing party in the contract
+        seller: The selling party in the contract
+        agreement_date: The date when the agreement was signed (date type)
+        agreement_number: Unique identifier for the contract
+        contract_type: Classification of the contract 
+    """
+    buyer: DocExtConfigField = Field(
+        name="Buyer",
+        default=DocExtConfigField(
+            name="Buyer",
+            field_name="buyer"
+        )
+    )
+    
+    seller: DocExtConfigField = Field(
+        name="Seller",
+        default=DocExtConfigField(
+            name="Seller",
+            field_name="seller"
+        )
+    )
+    
+    agreement_date: DocExtConfigField = Field(
+        name="Agreement date",
+        default=DocExtConfigField(
+            name="Agreement Date",
+            field_name="agreement_date",
+            type="date"
+        )
+    )
+    
+    agreement_number: DocExtConfigField = Field(
+        name="Agreement number",
+        default=DocExtConfigField(
+            name="Agreement Number",
+            field_name="agreement_number",
+            description="The identifier of this contract."
+        )
+    )
+    
+    contract_type: DocExtConfigField = Field(
+        name="Contract type",
+        default=DocExtConfigField(
+            name="Contract Type",
+            field_name="contract_type",
+            type="string",
+            description="The type of contract between the buyer and the seller."
+        )
+    )
+
+
+@flow(
+    name ="custom_flow_docext_example",
+    display_name="custom_flow_docext_example",
+    description="Extraction of custom fields from a document, specified by the user.",
+    input_schema=DocumentProcessingCommonInput
+)
+def build_docext_flow(aflow: Flow = None) -> Flow:
+    # aflow.docext returns 2 objects: the document extractor node and the schema of the extracted values.
+    # In this example, doc_ext_node is the node and is added to the flow.
+    # _ExtractedValues is the output schema of doc_ext_node and can be used as the input schema of nodes downstream in the flow.
+
+    doc_ext_node, _ExtractedValues = aflow.docext(
+        name="contract_extractor",
+        display_name="Extract fields from a contract",
+        description="Extracts fields from an input contract file",
+        llm="groq/openai/gpt-oss-120b",
+        fields=Fields()
+    )
+
+    aflow.sequence(START, doc_ext_node, END)
+    return aflow
+See all 90 lines
+
+Document classifier node (Public preview)
+Use the document classifier node to classify your documents.
+​
+Pre-requisites
+Run the following command to enable watsonx Orchestrate Developer Edition to process documents:
+BASH
+orchestrate server start -e <.env file path> -d
+Note: You need to configure a minimum allocation of 20GB RAM to your Docker engine during installation of watsonx Orchestrate Developer edition to support document processing features.
+Note: To run the document classifier, you must define the WO_INSTANCE, WO_API_KEY, and AUTHORIZATION_URL credentials in your .env file. For more information on configuring the .env file, see Installing the watsonx Orchestrate Developer Edition.
+​
+Configuring document extractor node in agentic workflows
+Define document classes. Create a class that defines the document classes to classify. Each document class must follow this structure:
+Python
+class CustomClasses(BaseModel):
+"""
+Configuration schema for document classification classes.
+
+Defines the document types/classes that the classifier can identify.
+Each class is configured with a DocClassifierClass that specifies the
+class name used for categorizing input documents. The classifier uses
+an LLM to analyze documents and assign them to one of these classes.
+
+Example custom classes:
+    invoice: Configuration for identifying invoice documents
+    contract: Configuration for identifying contract documents
+    tax_form: Configuration for identifying tax form documents
+    bill_of_lading: Configuration for identifying bill of lading documents
+"""
+invoice: DocClassifierClass = Field(default=DocClassifierClass(class_name="Invoice"))
+contract: DocClassifierClass = Field(default=DocClassifierClass(class_name="Contract"))
+tax_form: DocClassifierClass = Field(default=DocClassifierClass(class_name="TaxForm"))
+bill_of_lading: DocClassifierClass = Field(default=DocClassifierClass(class_name="BillOfLading"))
+Configure the document classifier node
+Include a call to the docclassifier() method in your agentic workflow to classify the document. This method accepts the following input arguments:
+​
+name
+stringrequired
+Unique identifier for the node.
+​
+llm
+stringrequired
+The LLM used for document classification. The default value is groq/openai/gpt-oss-120b.
+​
+display_name
+string
+Display name for the node.
+​
+classes
+objectrequired
+The document classification classes.
+​
+description
+string
+Description of the node.
+​
+min_confidence
+float
+Minimum confidence threshold for classification.
+​
+input_map
+DataMap
+Define input mappings using a structured collection of Assignment objects.
+​
+enable_review
+bool
+Enables or disables the human-in-the-loop feature. Set to True to activate it and False to deactivate. The default value is False.
+Note:
+The min_confidence setting controls the human-in-the-loop feature. This feature only works when you run the Flow from a chat session. If the document is classified with confidence lower than min_confidence, or as Other, the agent opens a review window in the chat. You can then review and confirm the extracted values.
+Example use of the docext node in an agentic workflow:
+Python
+from pydoc import Doc
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import (
+    Flow, flow, START, END
+)
+from ibm_watsonx_orchestrate.flow_builder.types import DocClassifierClass, DocumentProcessingCommonInput, DocumentClassificationResponse
+
+
+class CustomClasses(BaseModel):
+    """
+    Configuration schema for document classification classes.
+    
+    Defines the document types/classes that the classifier can identify.
+    Each class is configured with a DocClassifierClass that specifies the
+    class name used for categorizing input documents. The classifier uses
+    an LLM to analyze documents and assign them to one of these classes.
+    
+    Example custom classes:
+        invoice: Configuration for identifying invoice documents
+        contract: Configuration for identifying contract documents
+        tax_form: Configuration for identifying tax form documents
+        bill_of_lading: Configuration for identifying bill of lading documents
+    """
+    invoice: DocClassifierClass = Field(default=DocClassifierClass(class_name="Invoice"))
+    contract: DocClassifierClass = Field(default=DocClassifierClass(class_name="Contract"))
+    tax_form: DocClassifierClass = Field(default=DocClassifierClass(class_name="TaxForm"))
+    bill_of_lading: DocClassifierClass = Field(default=DocClassifierClass(class_name="BillOfLading"))
+
+
+@flow(
+    name ="custom_flow_docclassifier_example",
+    display_name="custom_flow_docclassifier_example",
+    description="Classifies documents into custom classes.",
+    input_schema=DocumentProcessingCommonInput
+)
+def build_docclassifier_flow(aflow: Flow = None) -> Flow:
+    # aflow.docclassifier returns a DocClassifierNode object.
+    # The output schema of a DocClassifierNode is a DocumentClassifierResponse object.
+
+    doc_classifier_node = aflow.docclassifier(
+        name="document_classifier_node",
+        display_name="document_classifier_node",
+        description="Classifies documents into one custom class.",
+        llm="groq/openai/gpt-oss-120b",
+        classes=CustomClasses(),
+    )
+
+    aflow.sequence(START, doc_classifier_node, END)
+
+    return aflow
+
+See all 51 lines
+
+Document text extractor node (Public preview)
+Use the document text extractor node to extract the texts from your documents.
+​
+Pre-requisites
+Run the following command to enable watsonx Orchestrate Developer Edition to process documents:
+BASH
+orchestrate server start -e <.env file path> -d
+Note: You need to configure a minimum allocation of 20GB RAM to your Docker engine during installation of watsonx Orchestrate Developer edition to support document processing features.
+​
+Configuring document processing in flows
+In your agentic workflow, include a call to the docproc() method to process a document.
+​
+Supported arguments
+​
+name
+stringrequired
+Unique identifier for the node.
+​
+task
+stringrequired
+Specifies which information is extracted from the document upon processing; supported values are:
+text_extraction: Extracts plain text from documents.
+​
+display_name
+string
+Display name for the node.
+​
+description
+string
+Description of the node.
+​
+output_format
+DocProcOutputFormat
+Controls the output schema of the results. The possible values are:
+DocProcOutputFormat.docref (“docref”): This is the default value.
+Returns a URL reference to the stored extraction result
+Response type: TextExtractionResponse
+Best for documents that contain large amount of text or complex structures where the expected output is large.
+DocProcOutputFormat.object (“object”):
+Returns extraction results as an inline JSON object.
+Response type: TextExtractionObjectResponse
+Best for small documents or when the output of this node needs to flow into another node.
+When using this value, it is highly recommended to map all top-level output fields in TextExtractionObjectResponse into the input of downstream nodes or the flow output.
+​
+input_map
+DataMap
+Define input mappings using a structured collection of Assignment objects.
+​
+document_structure
+boolean
+Controls whether the output includes additional fields as part of the document assembly. Set to true to include these fields.
+​
+kvp_schemas
+list[DocProcKVPSchema]
+The key-value pair schemas used for extraction.
+​
+enable_hw
+boolean
+Enable the handwritten feature by setting this to true.
+​
+kvp_model_name
+string
+The LLM model used for key-value pair extraction. If no value is provided, the default WDU model is used. The default model is currently watsonx/mistralai/mistral-small-3-1-24b-instruct-2503. The name of the model must match the list of models registered with your watsonx Orchestrate environment. To check the list of models, see List all LLMs.
+Compatible models must be able to process images as input and respond in JSON format. Examples include:
+watsonx/mistralai/mistral-small-3-1-24B-instruct-2503
+watsonx/mistralai/mistral-medium-2505
+watsonx/meta-llama/llama-4-maverick-17b-128e-instruct-fp8
+​
+kvp_force_schema_name
+string
+The schema name used for KVP extraction. If not set or None, uses the default schema.
+​
+kvp_enable_text_hints
+bool
+Enables text hints to assist with KVP extraction.
+​
+Using the docproc() method
+The input to a docproc node uses the DocProcInput type from the ibm_watsonx_orchestrate.flow_builder.types module. You can optionally configure the kvp_schemas parameter to define key-value pair input schemas. For more information, see Semantic Key-Value Pair (KVP) Extraction.
+Example use of the docproc node in an agentic workflow:
+Python
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import (
+    Flow, flow, START, END
+)
+
+from ibm_watsonx_orchestrate.flow_builder.types import DocProcInput
+
+
+@flow(
+    name ="text_extraction_flow_example",
+    display_name="text_extraction_flow_example",
+    description="This flow consists of one node: a docproc node, which extracts text from the input document",
+    input_schema=DocProcInput
+)
+def build_docproc_flow(aflow: Flow = None) -> Flow:
+    doc_proc_node = aflow.docproc(
+        name="text_extraction",
+        display_name="text_extraction",
+        description="Extract text out of a document's contents.",
+        task="text_extraction",
+    )
+
+    aflow.sequence(START, doc_proc_node, END)
+    return aflow
+See all 24 lines
+After the node runs, you receive a URL pointing to a file that contains the extracted text. If you configure key-value pair (KVP) extraction, the file also includes the extracted KVPs.
+​
+Semantic Key-Value Pair (KVP) Extraction
+Use the kvp_schemas parameter in the text extraction task to extract semantic key-value pairs from input documents.
+You can define this parameter in two places:
+Node specification: Set kvp_schemas in the node configuration. The node supports semantic KVP extraction in the following cases:
+If you define kvp_schemas in the input, the node uses those schemas. If you pass an empty array, it falls back to default schemas.
+If you don’t define kvp_schemas in the input but include them in the node specification, the node uses the specification-defined schemas. Again, if the array is empty, it defaults to the built-in schemas.
+The kvp_schemas is configured as a JSON object. The following example shows how to define kvp_schemas in a node configuration.
+Python
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import (
+    Flow, flow, START, END
+)
+
+from ibm_watsonx_orchestrate.flow_builder.types import DocProcInput
+
+
+@flow(
+    name ="kvp_extraction_flow_example_for_api",
+    display_name="kvp_extraction_flow_example_for_api",
+    description="This flow consists of one node: a docproc node, which extracts kvps from the input document",
+    input_schema=DocProcInput
+)
+def build_docproc_flow(aflow: Flow = None) -> Flow:
+    doc_proc_node = aflow.docproc(
+        name="kvp_extraction",
+        display_name="kvp_extraction",
+        description="Extract kvp out of a document's contents.",
+        task="text_extraction",
+        kvp_schemas=[{
+        "document_type": "Invoice",
+        "document_description": "An invoice is a standard document issued by a seller to a buyer, outlining products or services provided, quantities, prices, and payment terms.",
+        "additional_prompt_instructions": "Extract values exactly as they appear in the document, especially numbers and codes.",
+        "fields": {
+        "invoice_number": {
+            "description": "A unique identifier assigned by the vendor for this invoice.",
+            "example": "2023-AUS-987654",
+            "default": ""
+        },
+        "document_date": {
+            "description": "Date of the document.",
+            "example": "2025-07-05",
+            "default": ""
+        },
+        "vendor_name": {
+            "description": "Legal or trade name of the company issuing the invoice. Usually located in the header or footer, near the logo, or billing details.",
+            "example": "ABC Supply Company Pty Ltd",
+            "default": ""
+        },
+        "vendor_number": {
+            "description": "Internal identifier used by the buyer's system to refer to the vendor.",
+            "example": "VEND-1023",
+            "default": ""
+        }
+        }
+    }]
+    )
+
+    aflow.sequence(START, doc_proc_node, END)
+    return aflow
+See all 51 lines
+Runtime input: Set kvp_schemas in the input payload.
+The following example shows how to define a kvp_schemas in the input payload.
+Python
+import asyncio
+import logging
+import sys
+import json
+from pathlib import Path
+
+from examples.flow_builder.text_extraction.tools.text_extraction_flow import build_docproc_flow
+
+logger = logging.getLogger(__name__)
+
+
+def on_flow_end(result):
+    """
+    Callback function to be called when the flow is completed.
+    """
+    print(f"Custom Handler: flow `{flow_run.name}` completed with result: {result}")
+
+
+def on_flow_error(error):
+    """
+    Callback function to be called when the flow fails.
+    """
+    print(f"Custom Handler: flow `{flow_run.name}` failed: {error}")
+
+
+async def main(doc_ref: str, kvp_schema_path):
+    '''A function demonstrating how to build a flow and save it to a file.'''
+    my_flow_definition = await build_docproc_flow().compile_deploy()
+    global flow_name
+    flow_name = my_flow_definition.flow.spec.display_name
+    generated_folder = f"{Path(__file__).resolve().parent}/generated"
+    my_flow_definition.dump_spec(f"{generated_folder}/docproc_flow_spec.json")
+
+    with open(kvp_schema_path, 'r') as file:
+        # Load the JSON data from the file into a Python dictionary
+        schema_json = json.load(file)
+
+    global flow_run
+    flow_run = await my_flow_definition.invoke(
+        {
+        "document_ref": doc_ref, 
+        "language": "en",
+        "kvp_schemas": [ schema_json ]
+        }, 
+        on_flow_end_handler=on_flow_end, on_flow_error_handler=on_flow_error, debug=True)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        logger.error(f"Usage: {sys.argv[0]} file_store_path kvp_schema_path")
+    else:
+        asyncio.run(main(sys.argv[1], sys.argv[2]))
+See all 52 lines
+For both the node specification and runtime input, the default value of kvp_schemas is null. If you define the parameter in both places, the runtime input takes precedence and overrides the node specification. To use predefined extraction schemas, pass an empty array (kvp_schemas: []).
+Use kvp_force_schema_name to specify the schema name for KVP extraction. Use kvp_enable_text_hints to enable or disable text hints during extraction. Configure both settings inside the docproc() node.
+Python
+    @flow(
+        name="text_extraction_kvps_flow_example",
+        display_name="Text Extraction with KVP Extraction Flow",
+        description=(
+            "This flow consists of one node: a docproc node, which extracts text "
+            "and custom key-value pairs from the input document using a predefined schema"
+        ),
+        input_schema=DocProcInput,
+    )
+    def build_docproc_flow(aflow: Flow) -> Flow:
+        """
+        Build a text extraction flow with Key-Value Pair (KVP) extraction capabilities.
+        
+        This flow creates a document processing pipeline that:
+        1. Extracts raw text content from input documents
+        2. Identifies and extracts structured key-value pairs based on a predefined schema
+        
+        The KVP extraction uses a schema-driven approach to identify specific fields
+        like company information, invoice numbers, dates, and line items from invoices.
+        
+        Runtime Parameter Override:
+            All KVP-related parameters (kvp_schemas, kvp_model_name, kvp_force_schema_name,
+            kvp_enable_text_hints) can be provided at runtime when invoking the flow.
+            Runtime values will override the default values configured in this flow definition.
+            This allows for dynamic configuration without modifying the flow code.
+        
+        Args:
+            aflow: Flow builder instance provided by the @flow decorator.
+        
+        Returns:
+            Flow: Configured text extraction flow with KVP extraction
+                (START → docproc_node → END)
+            
+        Example:
+            >>> flow = build_docproc_flow()
+            >>> # Flow will extract text and KVPs from documents
+        """
+        # Validate Flow instance (defensive programming)
+        assert aflow is not None, "Flow instance must be provided by the @flow decorator"
+        
+        try:
+            # Get the KVP schema for invoice processing
+            kvp_schemas = get_sample_invoice_kvp_schema()
+            
+            # Create document processing node configured for text and KVP extraction
+            doc_proc_node = aflow.docproc(
+                name="text_extraction_with_kvp_node",
+                display_name="Text Extraction with KVP Node",
+                description="Extracts raw text and structured key-value pairs from an input document",
+                task="text_extraction",
+                # KVP extraction parameters.
+                #  Note: All kvp_* parameters below can be overridden at runtime when invoking the flow.
+                #  Runtime values take precedence over these default configuration values.
+                kvp_schemas=kvp_schemas,  # type: ignore[arg-type]  # Can be overridden at runtime
+                # Optional: Uncomment to use a specific LLM for KVP extraction. This defaults to mistral-small. (can be overridden at runtime)
+                kvp_model_name="watsonx/mistralai/mistral-small-3-1-24b-instruct-2503",
+                # Optional: Uncomment to force a specific schema (can be overridden at runtime)
+                kvp_force_schema_name="MyInvoice", # The "document_type" that will be used for KVP extraction. If not specified, the engine will try to match the input document to the given schemas.
+                # Optional: Enable/disable text hints for KVP extraction (can be overridden at runtime)
+                kvp_enable_text_hints=True,
+            )
+            
+            # Connect nodes in sequence: START → doc_proc_node → END
+            aflow.sequence(START, doc_proc_node, END)
+            
+            logger.info("Text extraction with KVP flow built successfully")
+            return aflow
+            
+        except Exception as e:
+            logger.error(f"Failed to build text extraction KVP flow: {e}", exc_info=True)
+            raise
+See all 71 lines
+​
+Document processing with output format
+See the following examples to learn how to use custom output formats with document processing:
+Python
+from typing import Optional
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import (
+    Flow, flow, START, END
+)
+from ibm_watsonx_orchestrate.flow_builder.types import (
+    DocProcField,
+    DocProcInput,
+    DocProcKVPSchema,
+    DocProcKey,
+    DocProcOutputFormat,
+    NodeErrorHandlerConfig,
+    TextExtractionObjectResponse,
+)
+
+
+class TextSummaryType(BaseModel):
+    summary: str = Field(description="Summary of the input text", default="")
+
+class TestFlowResultType(TextExtractionObjectResponse):
+    summary_text: str = Field(description="The summary of the text computed by the 'Text summary' node.", default="")
+
+INVOICE_KVP_SCHEMA: DocProcKVPSchema = DocProcKVPSchema(
+    document_type="MyInvoice",
+    document_description="A simple invoice document",
+    fields = {
+        "invoice_number" : DocProcField(
+            description="he unique identifier for the invoice.",
+            default="",
+            example="INV-0001",
+        ),
+        "total_amount" : DocProcField(
+            description="The total amount due on the invoice.",
+            default="",
+            example="1000.00",
+        ),
+        "due_date" : DocProcField(
+            description="The date on which the invoice is due.",
+            default="",
+            example="2023-01-01",
+        )
+    }
+)
+
+@flow(
+    name="text_extraction_and_summary_flow_example",
+    display_name="Text Extraction and Summary Flow",
+    description="This flow consists of two nodes. The first node extracts the raw text out of a document's contents. The second node uses the raw text to generate a summary using the GenAI node.",
+    input_schema=DocProcInput,
+    output_schema=TestFlowResultType
+)
+def build_docproc_flow(flow: Flow) -> Flow:
+    # Create the docproc node for text extraction
+    doc_proc_node = flow.docproc(
+        name="text_extraction_node",
+        display_name="Generic text extraction node",
+        description="Extract the raw text out of a document's contents.",
+        task="text_extraction",
+        #document_structure=True,
+        output_format=DocProcOutputFormat.object,  # Return JSON object instead of document reference
+        # Optional KVP (Key-Value Pair) extraction parameters:
+        kvp_schemas=[ INVOICE_KVP_SCHEMA ],
+        kvp_force_schema_name="MyInvoice",  # Force a specific schema to be used
+    )
+
+    # Explicitly map all flow inputs to the docproc node to prevent automap from
+    # overriding input values with potentially incorrect automatic mappings.
+    doc_proc_node.map_input(input_variable="document_ref", expression="flow.input.document_ref")
+    doc_proc_node.map_input(input_variable="kvp_schemas", expression="flow.input.kvp_schemas")
+    doc_proc_node.map_input(input_variable="kvp_model_name", expression="flow.input.kvp_model_name")
+    doc_proc_node.map_input(input_variable="kvp_force_schema_name", expression="flow.input.kvp_force_schema_name")
+    doc_proc_node.map_input(input_variable="kvp_enable_text_hints", expression="flow.input.kvp_enable_text_hints")
+
+    # A Prompt node that will summarize the text extracted from the input invoice.
+    my_summary_node = flow.prompt(
+      name="my_summary_node",
+      display_name="Text summary node",
+      description="Text summary node",
+      system_prompt=[
+          "You are a knowledge source."
+      ],
+      user_prompt=[
+          "Write a 2 sentence summary of: {text}"
+      ],
+      error_handler_config=NodeErrorHandlerConfig(
+          error_message="An error has occurred while invoking the LLM",
+          max_retries=1,
+          retry_interval=1000
+      ),
+      input_schema=TextExtractionObjectResponse,
+      output_schema=TextSummaryType,
+    )
+
+    # Map the text extracted from the input invoice to the user prompt of the Prompt node.
+    my_summary_node.map_input(input_variable="text", expression="flow[\"Generic text extraction node\"].output.text")
+
+    # START --> text extraction node --> prompt node --> END
+    flow.sequence(START, doc_proc_node, my_summary_node, END)
+
+    # Explicit output mapping is required when using DocProcOutputFormat.object.
+    # Without explicit mapping, the automap feature would attempt to automatically map outputs,
+    # which could inject large document structures into the LLM context and cause token overflow.
+    # By explicitly mapping each output field, we maintain control over what data flows through.
+
+    # summary_text is the output from the Prompt node.
+    flow.map_output(output_variable="summary_text", expression="flow[\"Text summary node\"].output.summary")
+    # The text is the original raw text extracted from the input invoice, produced by the text extraction node.
+    flow.map_output(output_variable="text", expression="flow[\"Generic text extraction node\"].output.text")
+    # The kvps are the extracted kvps produced by the text extraction node.
+    flow.map_output(output_variable="metadata", expression="flow[\"Generic text extraction node\"].output.metadata")
+    flow.map_output(output_variable="kvps", expression="flow[\"Generic text extraction node\"].output.kvps")
+
+    # These are not produced by this example, but you need them if you set document_structure=True.
+    flow.map_output(output_variable="top_level_structures", expression="flow[\"Text extraction node with document structure\"].output.top_level_structures")
+    flow.map_output(output_variable="all_structures", expression="flow[\"Text extraction node with document structure\"].output.all_structures")
+
+    return flow
+See all 117 lines
+Python
+from ibm_watsonx_orchestrate.flow_builder.flows import (
+    Flow, flow, START, END
+)
+
+from ibm_watsonx_orchestrate.flow_builder.types import DocProcInput, DocProcOutputFormat, TextExtractionObjectResponse
+
+
+@flow(
+    name="text_extraction_object_output_flow_example",
+    display_name="Text Extraction with Object Output Example",
+    description="Extracts text content and document structure from input documents using document processing. The output will be an Object instead of a file URL. Supports PDF, DOCX, images, and other formats.",
+    input_schema=DocProcInput,
+    output_schema=TextExtractionObjectResponse,
+)
+def build_docproc_flow(flow: Flow) -> Flow:
+    """
+    Build a text extraction flow that outputs both text and document structure.
+    
+    This flow creates a document processing pipeline that extracts raw text
+    content along with the structural information (headings, paragraphs, tables,
+    etc.) from input documents.
+    
+    Args:
+        aflow (Flow, optional): Flow builder instance.
+    
+    Returns:
+        Flow: Configured text extraction flow with structure output (START → docproc → END)
+        
+    Note:
+        The document_structure parameter is set to True to include structural
+        information in the output. This is useful for downstream processing
+        that requires understanding of document layout.
+    """
+    assert flow is not None, "Flow instance must be provided"
+    
+    # Create document processing node for text extraction with structure
+    doc_proc_node = flow.docproc(
+        name="a_text_extraction_node",
+        display_name="Text extraction node with document structure",
+        description="Extracts the raw text from an input document and its structure",
+        task="text_extraction",  # Specifies text extraction task
+        document_structure=True,  # Output the document structure. This defaults to False.
+
+        output_format=DocProcOutputFormat.object,  # Output format is JSON object
+
+    )
+
+    # Explicitly map all flow inputs to the docproc node to prevent automap from
+    # overriding input values with potentially incorrect automatic mappings.
+    doc_proc_node.map_input(input_variable="document_ref", expression="flow.input.document_ref")
+    doc_proc_node.map_input(input_variable="kvp_schemas", expression="flow.input.kvp_schemas")
+    doc_proc_node.map_input(input_variable="kvp_model_name", expression="flow.input.kvp_model_name")
+    doc_proc_node.map_input(input_variable="kvp_force_schema_name", expression="flow.input.kvp_force_schema_name")
+    doc_proc_node.map_input(input_variable="kvp_enable_text_hints", expression="flow.input.kvp_enable_text_hints")
+
+    # Connect nodes in sequence: START → docproc → END
+    flow.sequence(START, doc_proc_node, END)
+
+    # Explicit output mapping is required when using DocProcOutputFormat.object.
+    # Without explicit mapping, the automap feature would attempt to automatically map outputs,
+    # which could inject large document structures into the LLM context and cause token overflow.
+    # By explicitly mapping each output field, we maintain control over what data flows through.
+    flow.map_output(output_variable="text", expression="flow[\"Text extraction node with document structure\"].output.text")
+    flow.map_output(output_variable="metadata", expression="flow[\"Text extraction node with document structure\"].output.metadata")
+    flow.map_output(output_variable="kvps", expression="flow[\"Text extraction node with document structure\"].output.kvps")
+    flow.map_output(output_variable="top_level_structures", expression="flow[\"Text extraction node with document structure\"].output.top_level_structures")
+    flow.map_output(output_variable="all_structures", expression="flow[\"Text extraction node with document structure\"].output.all_structures")
+
+    return flow
+See all 69 lines

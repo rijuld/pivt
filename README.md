@@ -26,11 +26,11 @@ cd adk && ./deploy.sh
 
 Set `APP_BASE_URL` (default `http://127.0.0.1:3000`) so tools call the live Next.js APIs. If `deploy.sh` fails to authenticate, set `ORCHESTRATE_AUTH_TYPE` to `ibm_iam` or `mcsp` to match your instance (the CLI usually infers the correct type from the service URL).
 
-Set `REDIS_URL` (e.g. `redis://127.0.0.1:6379`) when importing **`redis_memory.py`** tools so Pivt agents can read/write shared agent memory. Start Redis with `docker compose up -d redis`.
+Set `REDIS_URL` when importing **`redis_memory.py`** tools so Pivt agents can read/write shared agent memory. Examples: local `redis://127.0.0.1:6379` (e.g. `docker compose up -d redis`), or **Redis Cloud** `redis://default:<password>@<host>:<port>`. If the provider requires TLS, use `rediss://...`. Put the URL in **`.env.local`** (already sourced by `adk/deploy.sh`); do not commit credentials. **Driver Pivt** is configured to call the `redis_memory_*` tools with `agent_id` = `driver_pivt`.
 
 ### Redis agent memory (MCP + Orchestrate)
 
-- **Cursor / MCP clients:** [`mcp/redis-agent-memory`](./mcp/redis-agent-memory/) — stdio MCP server (`memory_get`, `memory_set`, `memory_delete`, `memory_list_keys`, `memory_append_event`, `memory_list_events`). Build once: `cd mcp/redis-agent-memory && npm install && npm run build`. Project [`.cursor/mcp.json`](./.cursor/mcp.json) points at `dist/index.js` with `REDIS_URL` and optional `MEMORY_NAMESPACE` (default `eis`).
+- **Cursor / MCP clients:** [`mcp/redis-agent-memory`](./mcp/redis-agent-memory/) — stdio MCP server (`memory_get`, `memory_set`, `memory_delete`, `memory_list_keys`, `memory_append_event`, `memory_list_events`). Build once: `cd mcp/redis-agent-memory && npm install && npm run build`. Project [`.cursor/mcp.json`](./.cursor/mcp.json) points at `dist/index.js`; set **`REDIS_URL`** (and optional **`MEMORY_NAMESPACE`**, default `eis`) in that file’s `env` block or override in Cursor MCP settings — use the **same** URL as Orchestrate (e.g. Redis Cloud) if you want one backing store.
 - **watsonx Orchestrate:** Python tools in [`adk/tools/redis_memory.py`](./adk/tools/redis_memory.py) use the **same Redis key layout** as the MCP server. Re-run `adk/deploy.sh` after starting Redis.
 
 ### Web search (Tavily)

@@ -1,0 +1,237 @@
+Overview
+Langflow is a powerful tool that enables developers to visually design, test, and deploy AI applications using a drag-and-drop interface.
+Langflow comes bundled with the watsonx Orchestrate ADK. Any Langflow flow you create with Langflow can be imported into your watsonx Orchestrate environment and used as tools by your agents.
+Follow these steps to author Langflow tools:
+1
+Create and share a Langflow flow
+
+Start by building your Langflow flow in Langflow. Use global variables to define dynamic values and customize behavior.
+Once your Langflow flow is ready, share it so it can be used in watsonx Orchestrate.
+
+Langflow example
+
+For more information, see Building Langflow tools.
+2
+Bind global variables to watsonx Orchestrate connections
+
+During Langflow flow creation, you might configure global variables to support dynamic behavior. To ensure your Langflow flow works correctly in watsonx Orchestrate, bind these variables to the appropriate connections.
+For more information, see Binding global variables to connections.
+3
+Import your Langflow flow into watsonx Orchestrate
+
+Import your Langflow flow using ADK CLI. For more information, see Importing Langflow tools.
+4
+Optional: Manage your Langflow tool on watsonx Orchestrate
+
+After importing your Langflow tool into watsonx Orchestrate, you can manage it using ADK CLI commands just like any other tool type. Use the CLI to list, update, delete, or export the Langflow JSON used to build the tool. For more information, see Managing tools.
+5
+Add your Langflow tool to an agent
+
+In your agent file, configure the Langflow tool in the tools schema to make it available to your agent.
+If you’re using watsonx Orchestrate Developer Edition, you can run the Langflow UI alongside Orchestrate services by adding the --with-langflow flag to the orchestrate server start command. For more information, see watsonx Orchestrate Developer Edition.
+BASH
+orchestrate server start -e <your-env-file> --with-langflow
+Prerequisites and limitations
+​
+Prerequisites
+Use Langflow version 1.7.1
+​
+Limitations
+Only key-value connection types are supported for Langflow flows.
+You can use Langflow tools on watsonx Orchestrate Developer Edition, IBM Cloud, and AWS. However, you can only import them using ADK.
+The exported Langflow tool name must contain only alphanumeric characters or underscores. It must not start with a number or an underscore.
+Langflow does not support asynchronous execution, so if the Langflow tool takes longer than 120 seconds to respond, the agent returns an error.
+Building Langflow tools
+Use the Langflow visual editor to build Langflow tools. It helps you quickly turn ideas into powerful, real-world solutions.
+If you’re using watsonx Orchestrate Developer Edition, enable Langflow by starting it with the --with-langflow flag. If you’re not using the Developer Edition, install Langflow manually. For more information, see Install Langflow in the Langflow documentation.
+Once you have access to the Langflow editor, start building your Langflow flow. The editor includes several pre-built templates that you can use as-is or customize to fit your needs. For more information, see Use the visual editor in the Langflow documentation.
+When building Langflow flow for watsonx Orchestrate, configure dynamic values as global variables. Then, bind these variables to watsonx Orchestrate connections to maintain their dynamic behavior. For more information, see Binding global variables to connections.
+
+Global variable example
+
+Binding global variables to connections
+During Langflow flow creation, you might find fields that require dynamic inputs—such as API keys, user credentials, among others. These inputs typically depend on user-specific configuration to run the Langflow flow properly.
+To handle this, configure these inputs as global variables in Langflow. These variables and their values are stored in your local environment.
+
+Global variable example
+
+Global variable names in Langflow must follow the format <app_id>_<variable>, where:
+<app_id>: the connection ID defined in watsonx Orchestrate.
+<variable>: the environment key defined in the connection.
+Example:
+langflow_app_USER_NAME
+In this case, langflow_app is the connection ID, and USER_NAME is the environment key.
+When you share a Langflow flow that includes global variables, Langflow stores the variable names. You can then bind these names to a watsonx Orchestrate connection to make the Langflow flow work correctly in your Orchestrate environment.
+Example: Global variable example in shared Langflow flow JSON
+{
+  ...
+  "sender_name": {
+    "_input_type": "MessageTextInput",
+    "advanced": false,
+    "display_name": "Sender Name",
+    "dynamic": false,
+    "info": "Name of the sender.",
+    "input_types": [
+      "Message"
+    ],
+    "list": false,
+    "list_add_label": "Add More",
+    "load_from_db": true,
+    "name": "sender_name",
+    "placeholder": "",
+    "required": false,
+    "show": true,
+    "title_case": false,
+    "tool_mode": false,
+    "trace_as_input": true,
+    "trace_as_metadata": true,
+    "type": "str",
+    "value": "langflow_app_USER_NAME"
+  },
+  ...
+}
+See all 27 lines
+Follow these steps to bind global variables to a watsonx Orchestrate connection:
+1
+Add and configure a connection
+
+Add and configure a key-value connection. Currently, only key-value for “team” is supported. You can do this using a file import or the CLI. For more information, see Adding and configuring connections.
+Example
+orchestrate connections add -a <app_id>
+orchestrate connections configure -a <app_id> --env draft -t team -k key_value
+2
+Set credentials for your connection
+
+Configure the global variables and their values in your key-value connection. Use the orchestrate connections set-credentials command with the —entries (-e) flag to define each variable. For more information, see Key Value Connections.
+Example
+orchestrate connections set-credentials -a <app_id> --env draft -e <global-variables>=<value>
+TIP:
+If your environment already defines the global variables as environment variables, you can use them to set values in your watsonx Orchestrate connection. Instead of manually entering each value, reference the variable using the $ syntax. This allows Orchestrate to automatically retrieve the value from your system at runtime.
+Example
+orchestrate connections set-credentials -a langflow_app --env draft -e USER_NAME=$USER_NAME
+After binding your global variables to a watsonx Orchestrate connection, use that connection when importing your Langflow flow into watsonx Orchestrate.
+
+Importing Langflow tools
+Once you finish your Langflow flow, you can import it into watsonx Orchestrate. You have two options:
+Import by Langflow flow name
+Import by Langflow flow JSON
+​
+Importing Langflow flow using Langflow flow name
+To import a flow by name, pass the Langflow flow name in the CLI import command. This method works only if you use Langflow integrated with watsonx Orchestrate Developer Edition during the import process. Otherwise, the command fails.
+The command imports the latest version of the specified Langflow flow with its global variables. If a flow with the same name exists, the command updates it.
+To import a Langflow flow using its name, run:
+BASH
+orchestrate tools import -k langflow -n <langflow-flow-name>
+Show command flags
+
+​
+Importing Langflow flow using Langflow flow JSON
+You can also import a flow using its exported JSON file. After you finish the flow, share it and export it as a JSON file for watsonx Orchestrate. When exporting, select Save with my API keys. For more information, see Import and export flows.
+
+Save with my API keys option
+
+Note:
+If your Langflow flow uses global variables, bind these variables to watsonx Orchestrate connections first. For more information, see Binding global variables to connections.
+Then, to import a Langflow flow, run:
+BASH
+orchestrate tools import -k langflow -f <json-file-path> -a <app-id> -r <requirements-file-path>
+Show command flags
+
+Binding global variables to connections
+Previous
+
+Managing tools
+Managing tools in your active environment keeps your tools organized, current, and ready to use. Tools represent the capabilities your agents rely on, so proper management is essential for smooth operations.
+​
+Listing tools
+To check which tools are in your environment, run the orchestrate tools list command. The output shows all available tools and includes details such as their unique names. To get complete information about each tool, use the verbose option. The verbose output returns the list in JSON format with every detail.
+BASH
+orchestrate tools list -v
+Show command flags
+
+​
+Exporting tools
+To migrate a tool to another environment or share it with your team, run the orchestrate tools export command. Exporting saves time and ensures consistency across environments. This command supports Python, Agentic Workflow, Langflow, and OpenAPI tools imported via CLI.
+BASH
+orchestrate tools export -n <tool-name> -o <zip-output-path>
+Show command flags
+
+Note:
+When you export an agentic workflow tool it also exports all tools associated with that agentic workflow tool.
+​
+Updating tools
+To refresh a tool’s configuration, run the orchestrate tools import command again with the same tool unique name. This action keeps the tool current and updated.
+BASH
+orchestrate tools import -k <kind of the tool> -f <path the tool file that you want to update> -a <id of the app> -r <path to the requirements.txt file>
+Show command flags
+
+​
+Removing tools
+To remove a tool you no longer need, run the orchestrate tools remove command. Removing unused tools keeps your environment clean and prevents accidental use of outdated tools.
+BASH
+orchestrate tools remove -n my-tool-name
+
+Logging behavior for Python tools in watsonx Orchestrate
+Logging for Python tools in watsonx Orchestrate is intended to help support debugging during tool execution in watsonx Orchestrate SaaS, with clearly defined limits and lifecycle behavior.
+The process describes the recommended approach for Python tool development. Start tool development without any dependency of Watson Orchestrate Developer edition or watsonx Orchestrate SaaS. Develop and run all tool unit tests with Python as the only required runtime, along with the open source watsonx Orchestrate ADK Python library and any additional dependencies used by the tool. When you are past the unit test phase, deploy your tool to Developer edition, where the developer has full access to the tool pod outputs. Afterward, deploy the tool to watsonx Orchestrate SaaS.
+In SaaS, use the ibm_watsonx_orchestrate.run.logging.SpanLogger class, provided logs are captured per tool invocation and are made available as part of trace data for the tool execution, subject to size constraints.
+​
+Overview
+When a Python tool runs in watsonx Orchestrate, the platform records execution details for that tool invocation to support observability and troubleshooting. To prevent excessive tool logs, overloading the system and to avoid the collection of sensitive customer data, tool logging behaves as follows:
+Logs are collected per tool invocation
+Logs are associated with the individual execution record of that tool in observability and 20 KB of most recent log data is available.
+To aid performance, logs are written after tool execution completes
+Process crash in user Python tool code is unexpected and rare. However, in such unexpected cases, only the exit code of the process is available.
+​
+Supported logging mechanism
+Additionally, Python tools can write logs to observability by using the capability that is provided by watsonx Orchestrate:
+PYTHON
+from ibm_watsonx_orchestrate.run.logging import SpanLogger
+
+logger = SpanLogger()
+logger.info("Starting validation step")
+logger.error("Failed to fetch employee record")
+This logger is designed specifically for tool‑level observability and integrates directly with the watsonx Orchestrate tracing infrastructure. Over and above this specific logger, a tool can write logs to its owned external storage without any restrictions.
+​
+How tool logging works
+The logging lifecycle for a Python tool invocation is as follows:
+A tool invocation begins and an execution record for the tool is created.
+Log messages that are written during execution are buffered in memory.
+When the tool invocation completes, either successfully or with a handled exception, most recent buffered logs are written as part of the tool’s execution record.
+The logs can be retrieved together with the execution trace data for that request.
+​
+Association with tool execution
+Log entries that are generated by a Python tool are:
+Associated with the span that represents that tool invocation
+Part of the overall trace for the request
+Retrieved together with traces by using the Traces API
+This association allows tool logs to be correlated with the surrounding workflow and other spans in the same request.
+​
+Error and failure behavior
+If a tool raises an exception that is handled by the runtime:
+The tool’s span is marked with status ERROR.
+Recent buffered log entries are written to the tool span.
+The trace remains available for the standard trace retention period.
+This behavior provides visibility into both the error status and the tool logs associated with a failed invocation.
+Tool logs are written only after execution completes or fails with a handled exception. If the process stops unexpectedly, only the exit code is recorded.
+​
+Log retention and limits
+To prevent excessive tool logs overloading the system, ibm_watsonx_orchestrate.run.logging.SpanLogger logs are subject to the following constraints:
+Only the most recent log entries are retained.
+The total amount of log data per invocation is capped (approximately 20 KB).
+Individual log entries have a maximum size.
+When limits are exceeded, older log entries are discarded first.
+This logging mechanism is intended to provide context around error paths and failures.
+​
+Intended usage
+This logging capability is designed to:
+Support edge‑case debugging for watsonx Orchestrate SaaS tool execution through observability.
+Provide contextual information when tools fail.
+Enable observability through trace inspection in development and production environments.
+​
+Recommendations for logging
+Persistent, high‑volume, or detailed logging is handled by the tool writing to external storage such as S3 or dedicated logging services.
+To enable correlation with watsonx Orchestrate execution data, include the request thread identifier when you log in externally:
+PYTHON
+thread_id = context.request_context.get("thread_id")
+External logs can be correlated with the corresponding tool execution.

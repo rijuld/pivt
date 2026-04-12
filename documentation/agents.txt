@@ -1,0 +1,1557 @@
+Overview
+In watsonx Orchestrate, agents are the core building blocks that execute tasks on behalf of users. An agent combines a large language model (LLM) with tools, collaborators, and optional knowledge sources to deliver intelligent, context-aware automation. Agents can be native, built directly in watsonx Orchestrate, or external, integrated from other platforms such as watsonx.ai, Salesforce AgentForce, or third-party frameworks via supported protocols.
+​
+What makes up an agent?
+Every agent includes:
+Name and Description
+The name uniquely identifies the agent, while the description serves two purposes:
+It helps users understand the agent’s role and capabilities in the UI.
+It informs supervisor agents when routing requests to collaborators. A well-crafted description should summarize the agent’s purpose, tools, and domain knowledge.
+Instructions
+Instructions are natural language directives that shape the agent’s behavior. They define the agent’s persona, reasoning style, and how it should use tools and collaborators to solve tasks. Clear instructions ensure predictable, high-quality responses.
+Tools and Collaborators
+Tools extend the agent’s functionality by enabling API calls, Python scripts, or other operations. Collaborators are other agents—native or external—that the agent can invoke to complete complex workflows.
+Knowledge Base (optional)
+Agents can access domain-specific knowledge from uploaded documents or connected vector stores, improving accuracy for specialized queries.
+​
+Agent types
+Native Agents: Built and managed within watsonx Orchestrate using the Agent Development Kit (ADK).
+External Agents: Integrated from external platforms via protocols like external_chat or A2A.
+​
+What to do next
+Descriptions and instructions
+Learn more about agent descriptions and instructions, and how to write them effectively.
+Authoring agents
+Step-by-step guidance on creating your own agents, structuring their logic, and defining capabilities.
+Connect to external agents
+Explore how to integrate your system with external agents or services, and manage secure communication.
+Importing and deploying agents
+Learn how to import existing agents, configure deployment options, and publish agents to your environment.
+Managing agents
+Find out how to monitor, update, version, and control permissions for agents in your workspace.
+Integrating agents with my application
+Discover how to embed agents into your application using the embedded chat.
+
+
+Authoring native agents
+You create and import native agents into watsonx Orchestrate. Use YAML, JSON, or Python files to build agents for watsonx Orchestrate.
+​
+Configuring native agents
+Each native agent includes these components:
+​
+llm
+string
+Specifies the large language model (LLM) that powers the agent’s ability to understand and respond to queries. For more information, see Managing custom LLMs with the AI gateway.
+​
+style
+string
+Defines the prompting structure the agent uses. This structure determines how the LLM interprets and responds to instructions. For more information, see Choosing the agent style.
+​
+hide_reasoning
+boolean
+Defines whether the agent’s reasoning appears to the end user. When set to True, the agent hides its reasoning from the user. When set to False, the agent displays its reasoning. The default value is False.
+​
+instructions
+string
+Provides natural language guidance to the LLM. These instructions shape the agent’s behavior, such as adopting a specific persona like a customer service representative and explaining how to use tools and collaborators. For more information, see Writing instructions for agents.
+​
+tools
+list<string>
+Extends the LLM’s capabilities by enabling access to external functions and services. Examples include:
+OpenAPI definitions for external APIs
+Python functions for scripting more complex interactions with external systems
+Agentic workflows for orchestrating operations across tools and agents
+Toolkit-exposed tools such as an MCP server
+​
+collaborators
+list<string>
+Lists other agents this agent interacts with to solve complex problems. Collaborators can include native watsonx Orchestrate agents, external agents, or watsonx Assistants. For more information, see Connect to external agents.
+​
+description
+string
+Provides a human-readable summary of the agent’s purpose, visible in the Manage Agents UI. It also helps other agents understand its role when used as a collaborator. The description does not affect responses unless invoked as a collaborator. For more information, see Writing descriptions for agents.
+​
+knowledge_base
+list<string>
+Represents domain-specific knowledge that is acquired by the LLM from uploaded files or connected vector data stores. Agent Knowledge allows you to provide information that the agent should inherently know and use to answer questions. This knowledge can come from documents you upload or from various data sources integrated with watsonx Orchestrate, such as Milvus, Elasticsearch, AstraDB, and others. To learn more about setting up a knowledge base see the section on Knowledge bases.
+​
+restrictions
+string
+Specifies whether the Agent remains editable after import. This field accepts one of the following options:
+editable Sets the Agent as editable. This is the default value.
+non_editable Sets the Agent as non-editable and prevents it from being exported.
+​
+icon
+string
+An SVG-format string of an icon for the agent. The icon is used in the UI and in channels where the agent is connected to. It must follow these restrictions:
+SVG format
+Square shape
+Width and height between 64 and 100
+Maximum file size: 200 KB
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+kind: native
+name: agent_name
+llm: watsonx/ibm/granite-3-8b-instruct  # watsonx Orchestrate (watsonx) model provider followed by the model id: ibm/granite-3-8b-instruct
+style: default     
+hide_reasoning: False
+description: |
+    A description of what the agent should be used for when used as a collaborator.
+instructions: |
+    These instructions control the behavior of the agent and provide 
+    context for how to use its tools and agents.
+collaborators:
+  - name_of_collaborator_agent_1
+  - name_of_collaborator_agent_2
+tools:
+  - name_of_tool_1
+  - name_of_tool_2
+knowledge_base:
+  - name_of_knowledge_base
+restrictions: editable
+icon: "<svg></svg>" # SVG icon string for the agent
+​
+Additional features of native agents
+Customize your agent with extra features to match your needs.
+​
+Guidelines
+Use guidelines to control agent behavior. Guidelines create predictable, rule-based responses. Apply them when you need consistent actions.
+Define guidelines using the following format: When condition then perform an action and/or invoke a tool.
+Include only guidelines relevant to the current user request in the agent prompt. This reduces complexity for the LLM.
+Configure the guidelines in priority order. Guidelines execute it, based on their position in the list.
+To configure guidelines, add a guidelines section and define each guideline with these fields:
+​
+guidelines
+list<object>
+A list of guidelines the agent should follow. Each guideline uses the format:
+When condition then perform an action and/or invoke a tool. Provide at least one of action or tool.
+Hide properties
+
+​
+display_name
+stringdeprecated
+The name of the condition shown in the UI. This field is no longer used.
+​
+condition
+stringrequired
+The condition that triggers the guideline.
+​
+action
+string
+The action the agent performs when the condition is met.
+​
+tool
+string
+The tool to invoke when the condition is met, as listed by orchestrate tools list.
+
+YAML
+
+JSON
+spec_version: v1
+kind: native # Optional, Default=native, Valid options ['native', 'external', 'assistant']
+name: finance_agent
+style: default # Optional, Valid options ['default', 'react', 'planner']
+llm: groq/openai/gpt-oss-120b
+description: |
+  You are a helpful calculation agent that assists the user in performing math.
+  This includes performing mathematical operations and providing practical use cases for math in everyday life.
+instructions: |
+  Always solve the mathematical equations using the correct order of operations (PEMDAS):
+    Parentheses
+    Exponents (including roots, powers, and so on)
+    Multiplication and Division (from left to right)
+    Addition and Subtraction (from left to right)
+
+  Make sure to include decimal points when the user's input includes a float.
+guidelines:
+  - display_name: "User Dissatisfaction"
+    condition: "The Customer expresses dissatisfaction with the agents response."
+    action: "Acknowledge their frustration and ask for details about their experience so it can be addressed properly."
+  - display_name: "Joy check"
+    condition: "If the customer expresses joy or happiness about the response"
+    action: "Respond by making chicken noises like 'bock bock' and then take no further action"
+  - display_name: "Check user"
+    condition: "If the customer expresses the need to check a user in the system."
+    action: "Use the 'get_user' tool to check the user in the system"
+    tool: "get_user"
+
+tools:
+  - get_user
+collaborators: []
+See all 31 lines
+​
+Web chat configuration
+Adjust web chat settings to control how your agent behaves in the web chat UI. Set up a welcome message and starter prompts to guide users from the start.
+​
+Welcome message
+Welcome message example
+Welcome message example
+
+The welcome message is the first thing users see when they start interacting with your agent. Personalize this message to reflect your agent’s purpose. To configure it, define the welcome_content schema in your agent file:
+​
+welcome_content
+object
+Configures the welcome content.
+Hide properties
+
+​
+welcome_message
+stringrequired
+Specifies the welcome message shown to the user.
+​
+description
+string
+The text shown in light gray under the welcome message.
+Example:
+
+YAML
+
+JSON
+spec_version: v1
+style: react
+name: service_now_agent
+llm: groq/openai/gpt-oss-120b
+description:  'Agent description'
+instructions: ''
+collaborators: []
+tools: []
+hidden: false
+welcome_content:
+  welcome_message: "Hello, I'm Agent. Welcome to watsonx Orchestrate!"
+  description: "How can I help you today?"
+See all 12 lines
+​
+Starter prompts
+Start prompts example
+Starter prompts example
+
+Starter prompts are predefined messages that help users start a conversation with your agent. Configure these prompts in the starter_prompts section of your agent file.
+First, define whether these prompts are the default set. Then, for each prompt, specify these details:
+​
+starter_prompts
+object
+Configures starter prompts shown to the user.
+Hide properties
+
+​
+prompts
+list<object>required
+A list of starter prompt tiles shown to the user. You can define up to three tiles.
+Hide properties
+
+​
+id
+string
+The unique ID of the tile. It is auto-generated if not provided.
+​
+title
+stringrequired
+The bold title text displayed at the top of the starter prompt tile.
+​
+subtitle
+string
+The light gray text below the title.
+​
+prompt
+stringrequired
+The text sent to the agent as if entered by the user when the tile is clicked.
+Example:
+
+YAML
+
+JSON
+spec_version: v1
+style: react
+name: service_now_agent
+llm: groq/openai/gpt-oss-120b
+description:  'Agent description'
+instructions: ''
+collaborators: []
+tools: []
+hidden: false
+starter_prompts:
+    prompts:
+        - id: "hello1"
+          title: "Hello1"
+          subtitle: ""
+          prompt: "This is the messages for Hello prompt"
+See all 15 lines
+​
+Chat with documents
+Enable Chat with Documents to let users upload a document during a conversation and ask questions about its content. The document is available only for the session and is not stored in watsonx Orchestrate.
+Important:
+When you enable this feature, users can upload documents during chat interactions. The agent uses the file name to route prompts to the correct document. Make sure file names are unique and meaningful to avoid confusion.
+​
+chat_with_docs
+object
+Configures the Chat with Documents feature.
+Hide properties
+
+​
+enabled
+booleanrequired
+Activates Chat with Documents and allows users to upload documents at run time.
+​
+citations
+object
+Configures citation display settings.
+Hide properties
+
+​
+citations_shown
+number
+Maximum number of citations to display. Use -1 to display all citations.
+​
+generation
+object
+Fine-tune how your agent uses chat with documents.
+Hide properties
+
+​
+idk_message
+string
+Defines the fallback message sent to the user when the chat with documents feature cannot provide an answer.
+​
+supports_full_document
+boolean
+Starting in version 2.2.0, the supports_full_document field is removed. Agents always receive the full documents that users upload by default, so you no longer need to configure or manage this setting.
+Enables the Agent to request full documents instead of performing a search when it determines that full documents provide better support for answering the query. This option improves performance for tasks where search is less effective, such as summarization, proofreading, and extracting key points. The default value is True.
+
+YAML
+
+JSON
+spec_version: v1
+style: react
+name: service_now_agent
+llm: groq/openai/gpt-oss-120b
+description:  'Agent description'
+instructions: ''
+collaborators: []
+tools: []
+chat_with_docs:
+  enabled: true
+  citations:
+    citations_shown: -1
+  generation:
+    idk_message: 'Your I don’t know message'
+  supports_full_document: true 
+See all 15 lines
+​
+Providing access to context variables
+Use context variables to inject user-specific identifiers—such as username, user ID, or tenant ID—from upstream systems into your agent. This creates personalized, context-aware interactions during execution.
+Your agent includes these variables by default:
+wxo_email_id - The email address of the user who invoked the agent or tool
+wxo_user_name - The username of the user who invoked the agent or tool
+wxo_tenant_id - The unique tenant ID for the request
+wxo_thread_id - A unique identifier for a complete conversation session (chat thread) that groups all related messages.
+wxo_run_id - A unique identifier for each individual run within a thread, generated for every message to track each interaction step.
+Important:
+Do not use hyphens (-) when adding variables. Hyphens cause errors. Use underscores (_) instead.
+​
+context_access_enabled
+objectdefault:"false"
+Specifies if the agent can access context variables set by the Runs API.
+​
+context_variables
+list<string>default:"[]"
+Lists the context variables the agent can access.
+
+YAML
+
+JSON
+kind: native
+name: context_variables_sample
+display_name: Context Variables Agent
+description: I'm able to deal with context variables
+llm: groq/openai/gpt-oss-120b
+style: react
+instructions: |
+  You have access to additional information :
+    - wxo_email_id - {wxo_email_id}  
+    - wxo_user_name - {wxo_user_name}  
+    - wxo_tenant_id - {wxo_tenant_id}  
+  Help users by returning the values to you so you can respond back to user with these values.
+guidelines: []
+collaborators: []
+tools: []
+knowledge_base: []
+spec_version: v1
+context_access_enabled: true
+context_variables:
+  - wxo_email_id
+  - wxo_tenant_id
+  - wxo_user_name
+See all 22 lines
+Note:
+For scheduled workflows, the email address and username belong to the user who scheduled the workflow.
+To set context variables, pass a dictionary as context in the request body instead of context_variables when you use these endpoints:
+Runs API
+Chat Completions API
+Streaming Chat Completions API
+By default, agents invoked during a run cannot access context variables. To enable access, set context_access_enabled to true.
+After enabling access, specify the context_variables your agent uses. These variables define which contextual details—such as user identifiers or session data—are available during execution.
+You can reference these variables in descriptions, guidelines, or instructions by using curly braces like {my_context_variable}. You can also pass them as arguments to a Python function. When you pass them to a function, the agent runtime fills the values automatically without asking the user.
+
+YAML
+
+JSON
+spec_version: v1
+style: react
+name: service_now_agent
+llm: groq/openai/gpt-oss-120b
+description:  'Agent description'
+instructions: |
+  You have access to clientID: {clientID}
+collaborators: []
+tools: []
+context_access_enabled: true
+context_variables:
+  - clientID
+  - channel     # Use it to get access to channel integration (embedded chat)
+See all 13 lines
+
+Connect to external agents
+​
+External Agents
+External agents are built outside watsonx Orchestrate and can be used as collaborators for native agents.
+watsonx Orchestrate supports multiple provider protocols, including external_chat, the Agent-to-Agent Protocol (A2A), and specialized communication protocols for integrating with watsonx AI Agent Builder agents, watsonx Assistants, and Salesforce Agent Force agents.
+external_chat and A2A agents can be built on any underlying agent platform such as BeeAI, Langgraph, and CrewAI, where the user hosts the agent themselves, on Code Engine.
+​
+Providers
+​
+External Chat (Chat Completions API)
+The external_chat provider can be used to integrate with any agent that is capable of providing an OpenAI style chat completions endpoint and is the most common form of integration.
+The documentation for this API spec can be found on the watsonx-orchestrate-developer-toolkit.
+A reference Langgraph external agent can be found here.
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+kind: external 
+name: news_agent
+title: News Agent
+nickname: news_agent 
+provider: external_chat
+description: |
+  An agent built in langchain which searches the news.
+tags:
+  - test
+api_url: "https://someurl.com"   # the url of the external agent
+auth_scheme: BEARER_TOKEN        # one of BEARER_TOKEN | API_KEY | NONE 
+auth_config:
+  token: "123"                   # this is token for both BEARER_TOKEN and API_KEY 
+chat_params:                     # chat_parms are parameters sent to an agent on each request
+  stream: true                  # should the external agent be invoked using using SSE streaming or as a rest call 
+config:                          # config represents the internal configuration of this agent used by wxo
+  hidden: false                  # Hide this collaborator agent from the ui
+  enable_cot: true               # Does the external agent return all internal steps and tool calls
+See all 19 lines
+​
+Agent to Agent (A2A) Protocol
+The Agent to Agent Protocol (A2A) is an open standard designed to enable communication and interoperability between multiple agentic systems. Because the standard evolves rapidly, watsonx Orchestrate specifies the A2A version in the provider field to ensure compatibility when communicating with agents.
+The currently supported version is 0.3.0. Earlier versions, such as 0.2.1, are deprecated and will be removed in a future release. To ensure continued support, use version 0.3.0 or later when registering A2A-compatible agents.
+For a sample LangGraph agent compatible with the A2A protocol, see the a2a-samples repository.
+To register an agent that is compatible with the A2A protocol, set provider to external_chat/A2A/0.3.0, like the following example:
+
+YAML
+
+JSON
+spec_version: v1
+kind: external 
+name: news_agent
+title: News Agent
+nickname: news_agent 
+provider: external_chat/A2A/0.3.0 # this is the identifier for A2A agents, provider/protocol/version of A2A supported
+description: |
+  An agent built in langchain which searches the news.
+tags:
+  - test
+api_url: "https://someurl.com"   # the url of the external agent
+auth_scheme: BEARER_TOKEN        # one of BEARER_TOKEN | API_KEY | NONE 
+auth_config:
+  token: "123"                   # this is token for both BEARER_TOKEN and API_KEY 
+chat_params:                     # chat_parms are parameters sent to an agent on each request
+  sendHistory:                   # indicates whether conversation history should be sent to the external A2A agent
+  stream: false                  # should the external agent be invoked using using SSE streaming or as a rest call
+  pushNotifications: true        # set to true if the external agent can send push notifications to provide updates on async tasks
+config:                          # config represents the internal configuration of this agent used by wxo
+  hidden: false                  # Hide this collaborator agent from the ui
+See all 20 lines
+Asynchronous updates with push notifications (technical preview)
+For tasks that run for extended periods (e.g., minutes, hours, or days) or in scenarios where clients cannot maintain persistent connections—such as mobile applications or serverless functions — A2A supports asynchronous updates via push notifications. This mechanism enables the A2A Server to actively notify a client-provided webhook whenever a significant task update occurs.
+If your agent supports asynchronous push notifications for long-running tasks, register this capability by setting the property:
+YAML
+pushNotifications: true
+The push notification configuration is provided to the external A2A agent in the initial message/send or message/stream request. The A2A agent must include the complete update — such as message, task, and artifact details (as applicable) — in the notification payload, along with the corr_id value received in the metadata of the initial request.
+Push notifications use Bearer token authentication, where the token is generated from API keys as described in the Getting Started guide.
+Callback URL and authentication
+The callback URL is included in the request sent to the A2A agent. To send push notifications, you must:
+Use a valid API key to generate a Bearer token for authentication.
+Provide complete task update details in the notification payload, following the A2A protocol’s task object specification. Partial status updates are not sufficient.
+WXO supports the A2A protocol only over JSON-RPC 2.0 on HTTP. Although A2A can use multiple transport protocols, this implementation is limited to JSON-RPC 2.0.
+​
+watsonx AI Agent Builder
+You can also integrate with agents built using watsonx.ai’s agent builder platform.
+For more information, see Registering agents from watsonx.ai. Instead of using the API, complete the following YAML file and import your agent.
+Provide well-crafted descriptions for your agents. These descriptions are used by supervisor agents to determine how to route user requests. For more information, see Writing descriptions for agents.
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+kind: external 
+name: news_agent
+title: News Agent
+    provider: wx.ai                  # the provider will always be wx.ai
+description: | 
+  An agent built in langchain which searches the news.
+tags:
+  - test
+api_url: "https://us-south.ml.cloud.ibm.com/ml/v4/deployments/<id>/ai_service_stream?version=2021-05-01"
+auth_scheme: API_KEY             # this will always be API_KEY         
+auth_config:
+  token: "<my_api_key>"          # this is the API key for wx.ai  
+chat_params:
+  stream: true                   # should the external agent be invoked using using SSE streaming or as a rest call 
+config:
+  hidden: false                  # Hide this collaborator agent from the ui
+  enable_cot: true               # Does the external agent return all internal steps and tool calls
+See all 18 lines
+​
+Salesforce AgentForce
+To register an agent that is built within Salesforce Agent Force as an external agent:
+Follow the Getting Started Guide for the Agent API. For more information, see the Getting Started Guide.
+getting-started-salesforce.png
+On the Create a token page, the following information applies to all Salesforce agents within the instance:
+api_url: Always set to https://api.salesforce.com/einstein/ai-agent/v1.
+auth_config.token: Use the CONSUMER_SECRET provided in the guide.
+chat_params:
+client_id: Use the CONSUMER_KEY.
+domain_url: Use the DOMAIN_URL.
+Optionally, specify a list of display types to pass to Orchestrate as a comma-separated string.
+Provide well-crafted descriptions for your agents. These descriptions are used by supervisor agents to determine how to route user requests. For more information, see Writing descriptions for agents.
+Lastly, under chat_params you need to specify your agent_id. This can be found by hovering over one of your agents and either right-clicking and copying the URL, or by manually writing it based on hover text. In the following example, the agent_id is 0XxfJ0000001d8zSAA.
+agent-selection-salesforce.png
+
+YAML
+
+JSON
+
+Python
+name: salesforce_ext_agent 
+kind: external 
+provider: salesforce                            # the provider will always be salesforce
+title: Customer Service Agent by Salesforce
+tags:
+- "salesforce" 
+description: An AI customer service agent whose job is to help customers with support questions or other issues. 
+api_url: "https://api.salesforce.com/einstein/ai-agent/v1"
+auth_scheme: API_KEY
+auth_config:
+  token: "my-api-key"
+chat_params:
+  agent_id: "my-agent-id"
+  client_id: "my-client-id"
+  domain_url: "https://agentforceXXX-dev-ed.develop.my.salesforce.com"
+  # display_types: TextChunk,Confirm,Error,Failure,Inquire,Inform
+config:
+  hidden: false
+  enable_cot: false
+See all 19 lines
+​
+LangGraph agent
+You can import LangGraph agents directly into watsonx Orchestrate. During the upload process, Orchestrate applies the Agent to Agent protocol behind the scenes to make the agent compatible with the platform. You use the same streamlined experience that you use for Python agents or MCP agents. A2A‑enabled LangGraph agents support lifecycle tasks such as update, delete, and export.
+Limitations:
+Supported for Python implementations only.
+Agents that are run inside the watsonx Orchestrate environment with the required isolation.
+Supports only messages in the agent graph between turns, so complex custom state objects get lost between turns.
+Example:
+PYTHON
+"""
+Simple Agent: No LLM - Hello World
+A simple agent that returns a static "Hello World" message without using any LLM.
+"""
+from typing import Annotated, List, TypedDict
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.runnables.config import RunnableConfig
+from langgraph.graph import StateGraph, START, END
+
+
+class AgentState(TypedDict):
+    """Simple state with just messages."""
+    messages: Annotated[List[BaseMessage], "conversation history"]
+
+
+def hello_world_node(state: AgentState) -> AgentState:
+    """
+    Node that returns a static Hello World message.
+    No LLM involved - just returns a hardcoded response.
+    """
+    # Get the last user message if available
+    user_message = ""
+    if state["messages"]:
+        user_message = state["messages"][-1].content
+    
+    # Create a simple response
+    response = AIMessage(
+        content=f"Hello World! I received your message: '{user_message}'. "
+                f"I'm a simple test agent with no LLM - I just return this static message."
+    )
+    
+    return {"messages": state["messages"] + [response]}
+
+
+def create_agent(config: RunnableConfig) -> StateGraph:
+    """
+    Factory function that creates and returns a LangGraph StateGraph.
+    This agent has no LLM and just returns a static message.
+    
+    Args:
+        config: Runtime configuration (not used in this simple agent)
+    
+    Returns:
+        StateGraph: The compiled agent graph
+    """
+    # Build a simple linear graph: START -> hello_world -> END
+    workflow = StateGraph(AgentState)
+    workflow.add_node("hello_world", hello_world_node)
+    workflow.add_edge(START, "hello_world")
+    workflow.add_edge("hello_world", END)
+    
+    return workflow
+
+
+if __name__ == "__main__":
+    # Test the agent locally
+    from langchain_core.messages import HumanMessage
+    
+    app = create_agent({}).compile()
+    
+    # Test 1: Simple message
+    result = app.invoke({"messages": [HumanMessage(content="Hi there!")]})
+    print("Test 1 - Simple message:")
+    print(result["messages"][-1].content)
+    print()
+    
+    # Test 2: Different message
+    result = app.invoke({"messages": [HumanMessage(content="What can you do?")]})
+    print("Test 2 - Different message:")
+    print(result["messages"][-1].content)
+See all 70 lines
+This capability is supported through the A2A protocol.
+​
+External watsonx Assistants
+To register assistants from watsonx Assistant, you must obtain the following information:
+service_instance_url
+api_key
+assistant_id
+environment_id
+Note: The location of the service_instance_url and api_key varies depending on whether the assistant is imported to IBM Cloud or AWS.
+To retrieve your assistant ID:
+Navigate to the settings on the actions page and open the settings.
+actions_page.png
+On the farthest right tab, select Upload/Download, and click the Download button.
+actions-page.png
+Locate your environment_id and assistant_id in the output JSON.
+environment-id.png
+​
+IBM Cloud
+On IBM Cloud, your service_instance_url and api_key can be found on the page where you launch your assistant’s tooling UI.
+ibmcloud-service-keys.png
+Provide well-crafted descriptions for your agents. These descriptions are used by supervisor agents to determine how to route user requests. For more information, see Writing descriptions for agents.
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+kind: assistant
+name: hr_assistant
+title: HR Agent
+description: |
+  This assistant is capable of acting as a first point of contact for all support requests.
+tags:
+- wxa
+config:
+  assistant_id: assistantid
+  environment_id: environmentid
+  hidden: false
+  api_key: my-api-key
+  service_instance_url: https://api.eu-de.assistant.watson.cloud.ibm.com/instances/<my-instance-id>
+  api_version: '2023-06-15T00:00:00.000Z'
+  auth_type: IBM_CLOUD_IAM
+  authorization_url: https://iam.cloud.ibm.com
+See all 17 lines
+​
+AWS
+Provide well-crafted descriptions for your agents. These descriptions are used by supervisor agents to determine how to route user requests. For more information, see Writing descriptions for agents.
+
+YAML
+
+JSON
+
+Python
+spec_version: v1
+name: my_assistant
+title: my_assistant
+description: |
+  This assistant is capable of handling call center operations.
+kind: assistant
+tags:
+- wxa
+config:
+  assistant_id: assistantid
+  environment_id: environmentid
+  hidden: false
+  api_key: my-api-key
+  service_instance_url: https://api.us-east-1.preprod.aws.watsonassistant.ibm.com/instances/<my-instance-id>
+  api_version: '2023-06-15'
+  auth_type: MCSP
+  authorization_url: https://iam.platform.saas.ibm.com
+See all 17 lines
+​
+Additional features of external agents
+​
+Providing access to context variables
+Context variables enable builders to incorporate user-specific identifiers—such as username, user ID, or tenant ID—from upstream systems into an agent. These variables can currently be set through API-level integration by using the Runs API, the Chat Completions API, or its streaming variant.
+By default, agents invoked during a run do not have access to context. To enable access, set the context_access_enabled field to true and provide a list of context_variables to expose to the agent.
+Context variables are passed to the agent in the following ways:
+Runs API: Use the context field at the root of the request.
+Chat Completions API: Use the context field at the root of the request.
+Streaming variant: Each SSE event sent to the agent includes the context object.
+The context variables defined will be accessible to external A2A agents in the metadata of the message object.
+
+YAML
+
+JSON
+spec_version: v1
+kind: external
+name: news_agent
+title: News Agent
+nickname: news_agent
+provider: external_chat/A2A/0.3.0 # this is the identifier for A2A agents, provider/protocol/version of A2A supported
+description: |
+  An agent built in langchain which searches the news.
+tags:
+- test
+api_url: "https://someurl.com" # the url of the external agent
+auth_scheme: BEARER_TOKEN # one of BEARER_TOKEN | API_KEY | NONE
+auth_config:
+  token: "123" # this is token for both BEARER_TOKEN and API_KEY
+chat_params:                     # chat_parms are parameters sent to an agent on each request
+  sendHistory:                   # indicates whether conversation history should be sent to the external A2A agent
+  stream: false                  # should the external agent be invoked using using SSE streaming or as a rest call 
+config:
+  hidden: false # Hide this collaborator agent from the ui
+context_access_enabled: true
+context_variables:
+  - clientID
+See all 22 lines
+Show detailed parameter descriptions
+
+​
+Restricting Agents
+You can restrict external agents in watsonx Orchestrate by using the restrictions parameter in your external agent configuration.
+
+YAML
+
+JSON
+spec_version: v1
+kind: external
+name: news_agent
+title: News Agent
+nickname: news_agent
+provider: external_chat/A2A/0.2.0 # this is the identifier for A2A agents, provider/protocol/version of A2A supported
+description: |
+  An agent built in langchain which searches the news.
+tags:
+- test
+api_url: "https://someurl.com" # the url of the external agent
+auth_scheme: BEARER_TOKEN # one of BEARER_TOKEN | API_KEY | NONE
+auth_config:
+  token: "123" # this is token for both BEARER_TOKEN and API_KEY
+chat_params:                     # chat_parms are parameters sent to an agent on each request
+  sendHistory:                   # indicates whether conversation history should be sent to the external A2A agent
+  stream: false                  # should the external agent be invoked using using SSE streaming or as a rest call 
+config:
+  hidden: false # Hide this collaborator agent from the ui
+restrictions: editable
+See all 20 lines
+Authoring agents with the Orchestrate AI Builder
+The Orchestrate AI Builder is a powerful tool that helps you create and refine agents.
+It simplifies agent creation by allowing you to describe the agent you want. The AI Builder leverages its internal AI to create a new agent from scratch.
+The AI Builder can also help with existing agents through conversational interaction where you specify changes, or by using past conversations and feedback to automatically adjust the agent’s behavior to align with expectations.
+To use the AI Builder in the watsonx Orchestrate Developer Edition, add the --with-ai-builder flag to the orchestrate server start command. For more information, see Installing watsonx Orchestrate Developer Edition: watsonx Orchestrate server.
+​
+Creating agents
+Use the Orchestrate AI Builder to guide the agent creation flow. Start from scratch and build the agent through natural conversation.
+BASH
+orchestrate agents ai-builder create
+Show command flags
+
+Command examples
+Example 1
+Example 2
+Example 3
+Example 4
+Basic agent creation:
+BASH
+orchestrate agents ai-builder create -o output.yaml
+Orchestrate AI Builder interaction example
+The following example shows how you interact with the Orchestrate AI Builder to create an agent. In this example, you have already created and imported the string_reverser tool into your local instance.
+BASH
+🤖 Builder: To create a configuration for your agent in the IBM watsonx Orchestrate platform, let's start by describing the functionality of your agent. What tasks do you want your agent to perform, and what kind of operations should it be able to handle? Please provide a detailed or high-level description of your agent's intended functionality.
+
+👤 You: I want to create an agent that can reverse strings
+
+🤖 Builder: Based on your agent description, I've sorted the available tools by their relevancy and suggest the following tools for your agent:
+
+1. **string_reverser**: A tool that can reverse any provided string.
+
+Please select the tools you want your agent to use by specifying their numbers or names. If you want to see the full list of available tools, I can provide that as well. 
+
+Remember, you can choose one, multiple, or no tools for your agent.
+
+👤 You: 1
+
+🤖 Builder: You have selected the **string_reverser** tool for your agent.
+
+🤖 Builder: Based on your task description, I'll create an initial prompt. 
+
+**Role** - 
+You are an agent that can reverse strings according to the user's input.
+
+**Tool Usage Guidelines** - 
+1. Before you call a tool, make sure you have all the required tool parameters.
+2. Do NOT assume any tool parameters
+3. Do NOT pass parameters to the tool that are not explicitly defined
+4. Do NOT call the same tool multiple times with the same parameters
+
+**How To Use Tools**
+
+- When the user wants to reverse a string, call the string_reverser tool with the string as a parameter.
+
+Here's my initial prompt. How would you like the output to be formatted? Would you like it to be in a specific format, such as uppercase or lowercase?
+
+👤 You: No use that prompt its perfect
+
+╔══════════════════════════════════════════════════════════════════╗
+║  Your agent building session finished successfully!             ║
+║  Agent YAML saved in file:                                      ║
+║  /Users/user123/output.yaml                                     ║
+╚══════════════════════════════════════════════════════════════════╝
+See all 41 lines
+​
+Refining agents
+Use the Orchestrate AI Builder to take an existing agent and improve its instructions with your input.
+BASH
+orchestrate agents ai-builder prompt-tune
+Show command flags
+
+Command examples
+Basic refinement
+Refinement with output
+Dry run refinement
+Refine an existing agent and overwrite the input file:
+BASH
+orchestrate agents ai-builder prompt-tune -f input.yaml
+Orchestrate AI Builder interaction example
+The following example shows how you interact with the Orchestrate AI Builder to refine an agent. In this example, you have already created and imported the string_reverser tool into your local instance.
+BASH
+
+🤖 Builder: Based on your task description, I'll create an initial prompt. 
+
+**Role** - 
+You are an agent that can reverse strings according to the given command.
+
+**Tool Usage Guidelines** - 
+1. Before you call a tool, make sure you have all the required tool parameters.
+2. Do NOT assume any tool parameters
+3. Do NOT pass parameters to the tool that are not explicitly defined
+4. Do NOT call the same tool multiple times with the same parameters
+
+**How To Use Tools**
+
+- When the user wants to reverse a string, call the string_reverser tool with the string as a parameter.
+
+How would you like the output to be formatted? Should it be a simple reversed string, or would you like any additional information included?
+
+👤 You: I want the result formatted as a GitHub markdown table with 2 columns. The left column should be the input and the right should be the output. Please include headers on the table
+
+🤖 Builder: Based on your requirements, I'll refine the prompt.
+
+**Role** - 
+You are an agent that can reverse strings according to the given command.
+
+**Tool Usage Guidelines** - 
+1. Before you call a tool, make sure you have all the required tool parameters.
+2. Do NOT assume any tool parameters
+3. Do NOT pass parameters to the tool that are not explicitly defined
+4. Do NOT call the same tool multiple times with the same parameters
+
+**How To Use Tools**
+
+- When the user wants to reverse a string, call the string_reverser tool with the string as a parameter.
+- Format the output of the string_reverser tool as a GitHub markdown table with two columns, "Input" and "Output", where the input string is in the "Input" column and the reversed string is
+in the "Output" column.
+
+Here's an example of what the output table might look like:
+| Input | Output |
+| --- | --- |
+| xyz  | zyx  |
+
+Are you interested in continuing to refine the prompt, or is this sufficient for your needs?
+
+👤 You: That is sufficient
+See all 46 lines
+​
+Automatic agent refinement (autotune)
+You can automatically refine an agent using feedback from chat sessions.
+To do this, start by creating an agent and chatting with it. You will see two icons below each agent response that allow you to provide either positive or negative feedback.
+ai-builder-feedback-section.png
+After providing feedback, run the following command to refine an agent using feedback from chat sessions:
+BASH
+orchestrate agents ai-builder autotune
+Show command flags
+
+Command examples
+Basic autotune
+Autotune dry run
+Autotune last chat
+Autotune an agent with interactive message selection:
+BASH
+orchestrate agents ai-builder autotune -n <agent_name> -o <output_path>.yaml
+Orchestrate AI Builder interaction example
+The following example shows how you interact with the watsonx Orchestrate AI Builder to refine an agent. In this example, you have already created and imported a healthcare management agent, chatted with it, and provided feedback.
+BASH
+                                                            10 Most Recent Chats                                                            
+┏━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Number ┃ Chat Date                    ┃ Title                        ┃ Last User Message            ┃ Last User Feedback                 ┃
+┡━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│      1 │ October 01, 2025 at 12:49 PM │ Show me healthcare providers │ Show me healthcare providers │ 👎 This would be better as a table │
+│        │                              │                              │                              │                                    │
+└────────┴──────────────────────────────┴──────────────────────────────┴──────────────────────────────┴────────────────────────────────────┘
+Please enter up to 5 indices of chats you'd like to select, separated by commas (e.g. 1): 1
+
+[INFO] - Your agent refinement session finished successfully!
+[INFO] - Agent YAML with the updated instruction saved in file: <output_path>.yaml
+See all 12 lines
+Choosing the agent style
+Agent styles define how the agent follows instructions and how it behaves. You can choose from three styles:
+Style	How It Works	Best For
+Default (default)	Uses LLM prompts to decide tools and actions dynamically.	Simple, linear tasks needing flexibility.
+ReAct (react)	Iterative loop: Think → Act → Observe. Adjusts based on outcomes.	Complex, evolving tasks needing reasoning.
+Plan-Act (planner)	Creates a structured plan first, then executes step by step.	Multi-step workflows needing transparency.
+Note:
+If you use groq/openai/gpt-oss-120b as your agent’s model, the agent ignores all styles, except for the Customer Care style. Choose a different model to use the other styles.
+​
+Default style
+Choose Default (default) for simple tasks. This style uses a streamlined, tool-centric reasoning mode. The LLM decides which tool to use, how to use it, and when to respond. It works best for linear logic, such as retrieving a report or checking a ticket, because the agent orchestrates tool calls dynamically.
+Use this style for:
+Single-step or lightly sequential tasks
+Scenarios that need flexibility
+Tasks that involve multiple tools without strict sequencing
+Behavior	Tool Compatibility	Example use cases
+Prompts the LLM to:
+- Identify which tool or collaborator to invoke
+- Determine inputs
+- Decide whether to call more tools or finalize a response
+Continues prompting until it gathers enough context for an answer
+Python tools
+OpenAPI tools
+MCP tools
+Extract information from a system or the web
+Check the status of a task or ticket
+Perform tasks with well-defined steps
+​
+ReAct style
+Choose ReAct (react) for complex or ambiguous problems where each outcome influences the next step. This style uses an iterative loop: Think → Act → Observe. It supports reasoning, validation, and interactive confirmation. Inspired by the ReAct methodology, it surfaces the agent’s chain of thought.
+A ReAct agent breaks tasks into smaller steps, reasons through each, takes action, and adjusts based on what it learns. It might ask you for confirmation before continuing.
+Use this style for:
+Exploratory or research-intensive tasks
+Scenarios requiring iterative validation
+Tasks with unclear or evolving requirements
+Situations where transparent reasoning matters
+Behavior	Tool Compatibility	Example use cases
+Think: Assess the request and choose the right tool, collaborator, or reasoning step
+Act: Execute the tool or collaborator
+Observe: Evaluate the outcome and adjust reasoning
+Repeat until the goal is achieved
+Knowledge-intensive tools
+Data-intensive tools
+Collaborator agents
+Generate or refactor code
+Answer complex questions by searching and synthesizing information
+Handle support tickets with complex interactions
+​
+Plan-Act style
+Choose Plan-Act (planner) for structured workflows. The agent creates a plan first, listing tasks and tools, then executes each step in order. It can replan if conditions change. This style works well for multi-step processes and gives you transparency. By default, the planner style summarizes tasks planned and executed unless you define a custom output.
+Use this style for:
+Multi-step workflows
+Business processes needing transparency and traceability
+Automations involving multiple domains or collaborator agents
+Behavior	Tool Compatibility	Example use cases
+Create a structured plan before taking action
+List all tasks, tools, and collaborator agents in the plan
+Execute each step in sequence
+Adjust the plan if conditions change
+Provide a summary of tasks completed or a custom output if defined
+Python tools
+OpenAPI tools
+MCP tools
+Collaborator agents
+Create structured reports
+Combine results from multiple tools
+Draft contracts or compliance checklists
+​
+Customize the Response Output for Plan-Act
+To customize the output, define either structured_output or custom_join_tool:
+Note:
+structured_output and custom_join_tool are mutually exclusive. Use one, not both.
+
+structured_output.yaml
+
+custom_join_tool.yaml
+spec_version: v1
+style: planner
+structured_output: {type: "object",   additionalProperties: false, properties: {}}  # if no custom_join_tool is provided, provide a structured output
+name: customer_care_agent
+llm: watsonx/meta-llama/llama-3-2-90b-vision-instruct
+description: |
+  You are an agent who specializes in customer care for a large healthcare institution. You should be compassionate
+  to the user. ...
+collaborators:
+  - service_now_agent
+tools:
+  - search_healthcare_providers
+  - get_healthcare_benefits
+  - get_my_claims
+See all 14 lines
+The structured_output defines the schema for the agent’s response.
+The custom_join_tool is a Python tool that formats the output. For example:
+custom_join_tool.py
+from typing import Dict, List, Any
+from ibm_watsonx_orchestrate.agent_builder.tools import tool, ToolPermission
+from ibm_watsonx_orchestrate.agent_builder.tools.types import PythonToolKind
+
+@tool(permission=ToolPermission.READ_ONLY, kind=PythonToolKind.JOIN_TOOL)
+def format_task_results(original_query: str, task_results: Dict[str, Any], messages: List[Dict[str, Any]]) -> str:
+    """
+    Format the results from various tasks executed by a planner agent into a cohesive response.
+
+    Args:
+        original_query (str): The initial query submitted by the user.
+        task_results (Dict[str, Any]): A dictionary containing the outcomes of each task executed within the agent's plan.
+        messages (List[Dict[str, Any]]): The history of messages in the current conversation.
+
+    Returns:
+        str: A formatted string containing the consolidated results.
+    """
+    # Create a summary header
+    output = f"## Results for: {original_query}\n\n"
+
+    # Add each task result in a structured format
+    for task_name, result in task_results.items():
+        output += f"### {task_name}\n"
+
+        # Handle different result types appropriately
+        if isinstance(result, dict):
+            # Pretty format dictionaries
+            output += "```json\n"
+            output += json.dumps(result, indent=2)
+            output += "\n```\n\n"
+        elif isinstance(result, list):
+            # Format lists as bullet points
+            output += "\n".join([f"- {item}" for item in result])
+            output += "\n\n"
+        else:
+            # Plain text for other types
+            output += f"{result}\n\n"
+
+    # Add a summary section
+    output += "## Summary\n"
+    output += f"Completed {len(task_results)} tasks related to your query about {original_query.lower()}.\n"
+
+    return output
+See all 43 lines
+Agent descriptions and instructions
+Agents in watsonx Orchestrate are intelligent entities that automate tasks by combining a large language model (LLM) with tools, collaborators, and optional knowledge sources. To ensure agents are effective, predictable, and easy to maintain, developers must follow clear guidelines when defining names, descriptions, and instructions. These elements are not just metadata—they directly influence orchestration, user experience, and the quality of responses.
+​
+Why descriptions and instructions matter
+Descriptions and instructions are not just metadata—they directly influence orchestration:
+Supervisor agents rely on descriptions to route tasks to the right collaborator.
+Instructions guide the LLM’s reasoning, ensuring the agent uses its tools and collaborators effectively.
+​
+Naming agents and tools
+The name uniquely identifies the agent in the system and UI. Assign clear and unique names to each agent and tool you create. These names should reflect their capabilities and functions, making it easier for users to identify them within watsonx Orchestrate.
+To write effective names:
+Use snake_case instead of camelCase. They usually work better with routing agents. Agent names must not include spaces or special characters.
+Keep names short and descriptive.
+Avoid generic terms like “helper” or “assistant”.
+Use domain-specific language (for example sales_outreach_agent).
+Example
+Good: ibm_historical_knowledge_agent
+Bad: myAgent1
+​
+Writing instructions for agents
+Instructions define how an agent behaves, including its tone, reasoning style, and decision-making process. They guide the underlying language model to produce consistent, predictable outputs and determine how the agent uses tools and collaborators.
+They act as the agent’s persona and operating manual.
+They ensure the agent responds in a way that aligns with user expectations and organizational standards.
+They influence orchestration by determining when and how the agent invokes tools or other agents.
+​
+Best Practices for Writing Instructions
+Use natural language
+Write instructions as clear, conversational directives.
+Avoid overly technical or ambiguous phrasing.
+Example:
+Explain technical concepts in simple terms.
+When answering questions,
+provide short summaries first,
+then add details if the user asks for more.
+Define tone and style
+Specify whether responses should be professional, friendly, concise, etc.
+Example:
+Respond in a professional tone suitable
+for business communication.
+Include tool usage rules
+Tell the agent when and how to use specific tools.
+Example:
+Use the CRM API tool for customer data.
+If data is missing, ask clarifying questions
+before proceeding.
+Set error-handling guidance
+Define what to do if required information is unavailable.
+Example:
+If you cannot retrieve data, inform the user and
+suggest alternative actions.
+Avoid Overloading Instructions
+Keep them focused on behavior and decision-making, not on task-specific details.
+Example:
+Good
+Respond in a professional tone. Use the crm_api tool
+for customer data. If data is missing, ask
+clarifying questions before proceeding.
+Bad
+Respond professionally, but also be friendly
+and humorous when appropriate.
+Always check CRM data, but if unavailable,
+try ERP, then HR systems, and if
+those fail, suggest alternatives. Include
+emojis when the user seems happy,
+but avoid them in formal contexts. If
+scheduling is involved, call the
+Calendar agent, but only after confirming
+timezone differences and holidays.
+Also, summarize every response in bullet
+points unless the user asks for paragraphs.
+​
+Choosing your LLM
+The model you choose directly influences how an agent behaves and interprets instructions. Different models excel at different types of tasks, and many are trained with specialized capabilities. For example, some models include vision features, meaning they can process images, detect patterns, and answer questions about visual input. Other models are optimized specifically for code generation, and may not perform as well in general-purpose tasks.
+To understand the full capabilities, limitations, and intended use cases of a model, always refer to the model provider’s documentation, typically found in platforms like HuggingFace or watsonx.ai.
+watsonx Orchestrate offers a variety of models you can select from when creating agents, each suited for different workflows and business needs. To see the list of all supported models, you can run the following command:
+orchestrate models list
+You can also add new models to the list of supported models by using the AI gateway. For more information, see Managing custom LLMs with the AI gateway.
+​
+The default model (groq/openai/gpt-oss-120b)
+GPT-OSS-120b is OpenAI’s most powerful open-weight large language model, released under the Apache 2.0 license, making it fully suitable for commercial use, customization, and enterprise deployment. It contains around 117-120 billion parameters using a Mixture of Experts (MoE) architecture, which activates only a subset of parameters during inference, enabling strong performance with manageable compute requirements.
+Within watsonx Orchestrate, GPT-OSS-120b has recently become the default model for building agents, leveraging its strong reasoning capabilities and reliable tool-use behavior. IBM hosts the model on watsonx.ai, enabling secure enterprise usage, integration with Orchestrate agents, and optional high-speed inference through providers such as Groq.
+Here are a few features of this model:
+Advanced Reasoning & Chain-of-Thought: GPT-OSS-120b supports full chain-of-thought reasoning, making it effective for complex instructions, multi-step logic, and orchestrator-style agents that need to autonomously decide which tools or actions to take.
+Strong Agentic Capabilities: The model natively supports:
+Function/tool calling
+Structured output formats
+Web browsing & Python execution (where supported)
+Interacting with multi-tool agent workflows
+Large Context Window: GPT-OSS-120b offers a 131k-128k token context window (depending on provider), enabling it to process lengthy documents, logs, or multi-turn interactions without losing context.
+Fine-Tuning & Customization: Because it is fully open-weight and under Apache 2.0, the model can be:
+Fine-tuned
+Self-hosted
+Customized with enterprise data
+Integrated into internal workflows
+Note:
+This model is a non-IBM product governed by a third-party license that may impose use restrictions and other obligations. By using this model you agree to the terms. Read the terms.
+​
+Writing instructions for GPT-OSS-120b
+GPT-OSS-120b is highly capable but also sensitive to vague or conflicting instructions. To ensure reliable behavior:
+Be explicit: Clearly state priorities and constraints.
+Avoid ambiguity: Conflicting directives can lead to unpredictable outputs.
+Test iteratively: Validate instructions with sample tasks before deploying.
+Limit complexity: Break down multi-step reasoning into clear, sequential guidance.
+Example for groq/openai/gpt-oss-120b:
+Always respond in a professional tone. When asked for CRM data,
+use the salesforce_api tool. If the request involves scheduling,
+call the calendar_agent. If information is incomplete, ask
+clarifying questions before proceeding.
+​
+Special considerations
+The default groq/openai/gpt-oss-120b model does not use the standard system prompt from watsonx Orchestrate. As a result, it can behave differently from other models, including:
+Not explicitly identifying itself as part of the watsonx Orchestrate ecosystem.
+Preferring its internal knowledge over your connected knowledge bases, unless you instruct otherwise.
+Hyperlinks might not be formatted properly, unless you instruct otherwise.
+It does not follow the supported Agent styles.
+If you’re migrating existing agents from Llama to GPT-OSS-120B, see the comprehensive Migration guide for detailed instructions, common challenges, and optimization strategies.
+Use explicit, natural-language constraints that limit reasoning depth, enforce brevity, and prioritize external knowledge. Add one or more of the following blocks to your agent’s instructions:
+Prioritize knowledge bases over internal knowledge
+Always check the connected knowledge base(s) first.
+Prefer information retrieved from knowledge over your
+own internal knowledge. If relevant content is found,
+summarize it faithfully and cite the source title or document
+name. If the knowledge base does not contain the answer, say
+"I don't know based on the provided knowledge" and ask
+a clarifying question.
+Cap reasoning depth and iteration count
+Use concise reasoning. Limit yourself to
+a maximum of 3 reasoning steps before answering.
+Do not re-plan unless the last tool result contradicts
+prior assumptions. If you cannot progress after 3 steps,
+ask one focused clarifying question.
+Formatting
+When generating hyperlinks, use the correct Markdown syntax: [link](url).
+Keep chit-chat short
+Keep small talk to a single sentence.
+Immediately pivot to the user's task with a
+concise question or action.
+Enforce a strict output budget
+Target an answer length of 4-6 sentences (or ≤150 words).
+Use bullet points only when they increase clarity.
+Avoid repeating the prompt or restating obvious context.
+Fail fast when data is missing
+If required inputs are missing, do not speculate.
+Ask for the minimum missing fields in a single
+question and wait.
+​
+Combined instruction example (recommended template)
+Use this as a compact block tailored for groq/openai/gpt-oss-120b:
+Behavior and sources:
+- Identify as an agent operating within watsonx Orchestrate.
+- Always use available tools to retrieve information before relying on your internal knowledge.
+- If tools don't contain the answer, explicitly state "The available tools don't contain the answer", state that clearly and ask one clarifying question.
+
+Reasoning and brevity controls:
+- Use concise reasoning with at most 3 reasoning steps before responding.
+- Keep chit-chat to one sentence, then proceed.
+- Limit final answers to ≤150 words unless the user requests detail.
+
+Formatting:
+- When generating hyperlinks, use the correct Markdown syntax: [link](url).
+ 
+Error handling:
+- If a tool call or retrieval fails, briefly describe the failure and propose the next best step or ask for a missing input.
+​
+Good vs. bad instruction snippets for this topic
+Good (concise, enforce constraints):
+Use knowledge bases as the primary source.
+Cite the document name when used.
+Limit yourself to 3 reasoning steps
+and less than 150 words in the final answer.
+If you cannot find an answer in knowledge,
+say so and ask one clarifying question.
+Bad (encourages runaway reasoning and verbosity):
+Think in exhaustive detail until you're
+absolutely certain. Explore all possible interpretations.
+Provide a comprehensive narrative of your
+thoughts and include context for every claim.
+​
+Writing descriptions for agents
+The agent description is used by an agent to determine when and how to delegate a task to a collaborator agent, tool or knowledge ensuring the right request is sent to the right capability. When adding any artifact (a collaborator agent, tool, or knowledge) to an agent, the agent description is critical to the agent’s success.
+Agent descriptions complement the agent names by providing detailed information about their purpose, capabilities, and usage. A well-written description helps users understand the agent’s role and potential applications.
+Descriptions should not be written in isolation — they must reflect the agent’s scope, use cases, and interaction with collaborators, tools, and knowledge bases. This ensures reliable routing and prevents ambiguity.
+​
+Key principles
+Descriptions as instructions: Treat the agent description like instructions to the agent on how it should use the artifact (collaborator agent, tool, or knowledge base) in question
+Hierarchy matters:
+Agent descriptions are broader and set the overall purpose.
+Collaborator descriptions narrow the scope to specific tasks.
+Tool descriptions are the most specific, clarifying exact functionality.
+Avoid overlap: Each agent should have a distinct scope. If scopes are similar, clearly differentiate them.
+Include context markers:
+Geographic scope (for example, “US”) helps route queries correctly.
+Domain-specific language (for example, “pet-parents and their fur-babies”) sets tone and aligns with instructions.
+Don’t overload descriptions: Mention core capabilities, not every tool. The agent should infer tool usage from context.
+Define trigger conditions: Clarify when the agent should use the artifact, such as “Use this when the user requests supplier risk evaluation or mentions creditworthiness.”
+Specify actions: Be specific about the actions the artifact should perform. When possible include how the artifact should performs those actions, such as “Access loan data from loan APIs, calculate affordability, and summarize affordability differences”
+Define restrictions: Note desired restrictions and limitations. Most artifacts will have a boundary they should stop at, such as “Do not give legal or tax advice, only provide estimates and data-driven comparisons”
+Use appropriate jargon: Define any industry specific terms of acronyms so they won’t be misunderstood.
+​
+Description examples
+HR agent description
+Use this agent to compare employee compensation data across
+similar roles and regions. Retrieve current market benchmarks
+from HR databases, analyze differences, and summarize how
+internal pay aligns with external trends. **Do not provide
+policy recommendations or make promotion decisions**.
+Supplier Analysis tool routing description
+Assesses supplier risk by retrieving ratings, credit data,
+and compliance history from Dun & Bradstreet and internal
+procurement systems. Summarizes financial stability, delivery
+reliability, and compliance risk. **Do not make purchase
+decisions or alter supplier records**.
+Finance agent routing description
+Analyze portfolio performance by pulling real-time stock
+and bond data, calculating returns, and comparing results
+against benchmarks. Summarize key performance drivers and
+risk factors. Do not provide personalized investment advice
+or execute trades.
+​
+Example: agent and collaborator description for a pet store
+The following example demonstrates how to write clear, context-rich descriptions for an agent and its collaborators, tools, and knowledge bases.
+This example also shows how tone and language can align with the agent’s persona, which should be reinforced in the instructions for a consistent user experience.
+Agent Description
+USPetTreeAgent
+A US PetTree attendant serving the needs of pet-parents
+and their fur-babies. It can help give general pet care
+advice, assist in the pet adoption process by matching
+users to cats and dogs, and order pet supplies from the
+PetTree US Store.
+Collaborator description
+MatchMakerAgent
+An agent to search the PetTree cat & dog registry
+to match animal lovers with cats and dogs seeking a
+forever home, and file a pet adoption application.
+Tools for MatchMakerAgent
+SearchPetTreeCats: Search the PetTree registry for cats available for adoption.
+SearchPetTreeDogs: Search the PetTree registry for dogs available for adoption.
+GetPetTreeAnimalProfile: Get the full profile of an individual cat or dog.
+ViewAnimalPhotos: View pictures of cats and dogs available for adoption.
+FileAdoptionApplication: File a pet adoption application for a specific cat or dog.
+Knowledge Base for MatchMakerAgent
+Cat Breeds Care: Facts, personalities, and care guides for different cat breeds.
+Dog Breeds Care: Facts, personalities, and care guides for different dog breeds.
+​
+Writing descriptions for tools
+A good tool description helps agents identify and use the tool effectively. It should include a general overview of the tool’s purpose, as well as details about its inputs and outputs. In Python tools, descriptions are defined in docstrings, following Google-style docstrings.
+Example:
+TEXT
+Retrieves all user information based on their unique identifier.
+
+Args:
+    id (str): The user's unique identifier.
+
+Returns:
+    dict: The user's information, including user_id, user_name, 
+    user_email, and user_phone.
+​
+Designing agents and tools for best performance
+When designing agents and tools, aim for balanced complexity. Components that are too simple may lack utility, while overly complex designs can reduce the model’s ability to reason effectively.
+​
+Guidelines for Agents
+Agents using LLaMA-based LLMs perform best with 10 or fewer tools or collaborators.
+For complex use cases requiring many tools, break the problem into smaller subproblems and assign them to collaborator agents.
+This limit may vary for more powerful models.
+​
+Guidelines for Tools
+Keep input and output schemas as simple as possible.
+Avoid tools with:
+A large number of input parameters.
+Parameters with deeply nested or complex data types.
+Complex schemas make it harder for the LLM to use the tool effectively.Agent development with Skills specifications
+IBM watsonx Orchestrate provides two MCP servers and agent-agnostic Skills specifications to help coding agents build solutions more reliably while reducing large context overhead.
+​
+MCP servers
+watsonx Orchestrate provides two MCP servers to support agent development:
+Documentation Server — Enables search of watsonx Orchestrate ADK documentation.
+CLI Server — Executes ADK CLI commands (for example, listing agents, listing tools, and applying modifications).
+Relying exclusively on the Documentation Server for the full programming model can lead to large context sizes. This may limit the agent’s ability to generate non-trivial examples and often requires frequent guidance.
+​
+SKILL.md specifications
+The sop-builder and wxo-builder specifications follow the Agent Skills format. These specifications provide condensed, high-signal guidance about the watsonx Orchestrate programming model.
+Benefits
+Coding-agent agnostic (works with any agent that supports the format).
+Reduces reliance on long, noisy documentation searches.
+Improves reliable follow-through and correctness.
+​
+Recommended approach
+Clone the watsonx Orchestrate ADK repository. Agents perform better when ADK examples are locally available.
+Repository location:
+https://github.com/IBM/ibm-watsonx-orchestrate-adk
+​
+Configuring MCP servers and SKILL specifications
+For all coding agents:
+Configure both MCP servers (Documentation Server and CLI Server).
+Download the SKILL specifications (sop-builder and wxo-builder).
+​
+Using modes with MCP access
+Choose a mode that includes MCP tool access when external integrations are required. Ask, Plan, and Advanced modes provide MCP capabilities, while Code mode does not. Use Code mode for standard development tasks where MCP is not needed.
+​
+Specification-driven development workflow
+Follow this recommended workflow:
+Use sop-builder to generate the Standard Operating Procedure (SOP).
+Have the subject matter expert (SME) validate the SOP.
+Use wxo-builder to generate the initial watsonx Orchestrate project. The generated README.md serves as the implementation specification.
+Update the solution as needed:
+If the business specification changes → update the SOP → rerun wxo-builder.
+If the implementation changes → update the README.md → rerun wxo-builder.
+Apply incremental updates or hand-edit remaining details as required.
+​
+wxO VS Code extension
+The wxO VS Code extension streamlines setup of the wxO ADK environment by automatically initializing and configuring the ADK and connecting to a remote wxO runtime. It eliminates manual steps such as managing folder structures, environment variables, and connections.
+The extension is optional.
+It does not affect how coding agents, including Bob, consume MCP servers or SKILL specifications.
+Coding agents operate independently of the extension.
+​
+Important considerations
+Coding agents differ in agent-loop quality and underlying model strength. Accuracy and consistency therefore vary across tools. These capabilities accelerate development, but you must still:
+Understand the generated code and its behavior.
+Validate correctness and quality.
+Ensure outputs align with the intended business and technical requirements.
+For more information on related capabilities, see Skills in Bob.
+Importing and deploying agents
+​
+Importing Agents
+Importing an agent involves transferring it from your local system into your active environment, where it enters a draft (undeployed) state. There are two supported methods for importing agents:
+Using an agent configuration file: Upload a pre-defined configuration that describes the agent’s components and behavior.
+Using the ADK CLI: Create and register the agent directly via the Agent Development Kit (ADK) command-line interface.
+​
+Importing agents using an agent file
+Use the orchestrate agents import command to import agents into the watsonx Orchestrate platform from a YAML, JSON, or Python file. You can import either natively built agents, external agents connected from other systemsm, or even custom agents.
+Native and External Agents
+(Public Preview) Custom agents
+To specify the agent file path, use the --file or -f flag:
+BASH
+orchestrate agents import -f <path to .yaml/.json/.py file>
+Show command flags
+
+Before running this command, make sure you have a valid agent configuration file. This file defines the parameters that describe the agent’s behavior and structure for watsonx Orchestrate. For details on how to author these configurations, see Authoring agents.
+​
+Bulk import from ZIP
+Import agents along with all their dependencies using a single ZIP file.
+You can import an agent and all its dependencies with the following command:
+BASH
+orchestrate agents import -f my_agent.zip
+The structure of the imported ZIP file matches the structure produced by the agent export command:
+BASH
+orchestrate agents export -k native -n my_agent -o my_agent.zip
+During the import process, tools require connections to be manually selected.
+​
+Creating agents directly from the CLI
+The orchestrate agents create command can be used to quickly create and import an agent into the watsonx Orchestrate platform without first having a file to import.
+Native Agent
+External Agent
+watsonx.ai External Agent
+(Public Preview) Custom agents
+BASH
+orchestrate agents create \
+--name agent_name \
+--kind native \
+--description "Sample agent description" \
+--llm watsonx/ibm/granite-3-8b-instruct \
+--style default \
+--collaborators agent_1
+--collaborators agent_2
+--tools tool_1
+--output "agent_name.agent.yaml"
+See all 10 lines
+Show command flags
+
+​
+Copy agents between workspaces
+BASH
+orchestrate agents copy --name <agent-name> --source <source-workspace-name> --destination <dest-workspace-name>
+Show command flags
+
+​
+Deploying Agents
+Agents in watsonx Orchestrate operate in one of two states: draft or live.
+A draft agent is actively being developed or modified by a builder. You can access draft agents from the Manage Agents page in the UI.
+A live agent is available to end users through the Web chat UI on the Orchestrate landing page.
+Note: In the watsonx Orchestrate Developer Edition, only the draft environment is available. This edition is designed for single-user, non-production use. As a result, the Web chat UI displays agents in their draft state instead of the live state. Attempting to run deploy commands in the Developer Edition will result in an error.
+​
+Deploying an agent
+Deploying an agent is the act of taking an agent from a draft state into a live state.
+BASH
+orchestrate agents deploy --name agent_name
+Note: By default the deploy agent command timesout after 5 minutes of checking the agent status. If you need to increase this you can use the WXO_AGENT_DEPLOYMENT_TIMEOUT environment variable. Default value is 300.
+​
+Undeploying an agent
+Undeploying an agent is the act of reverting an agent from its current live state to the previous live state.
+BASH
+orchestrate agents undeploy --name agent_name
+Managing agents
+​
+Listing agents
+Use the orchestrate agents list command to list all agents in your environment. You can filter by agent type and get detailed information using the available flags.
+BASH
+orchestrate agents list -v
+Show command flags
+
+​
+Exporting agents
+Use the orchestrate agents export command to export an agent configuration from your active environment.
+You can export the full agent configuration with all its dependencies (default), or only the agent configuration by including the --agent-only flag.
+BASH
+orchestrate agents export -n <agent-name> -k <agent-type> -o <output-path>.zip
+Show command flags
+
+Note: Agentic workflow tools are only exported when you use a local environment with watsonx Orchestrate Developer Edition.
+​
+Updating agents
+To update an agent, run the import command again using the same agent name as the agent you want to update.
+BASH
+orchestrate agents import -f <path to agent file that you want to update>
+If you’re updating an agent to use a different LLM (such as migrating from Llama to GPT-OSS-120B), see the Migration guide for model-specific optimization instructions.
+​
+Removing agent
+To remove an existing agent, run the following command:
+BASH
+orchestrate agents remove --name my-agent --kind native
+Show command flags
+
+​
+Chatting with an agent in interactive mode through the CLI
+To start a chat session with an agent, run the following command:
+BASH
+orchestrate chat ask --agent-name <agent_name>
+To start a chat session and ask an initial question, run the following command:
+BASH
+orchestrate chat ask --agent-name <agent_name> "What is the weather?"
+To start a chat session and view the agent’s reasoning trace, run the following command:
+BASH
+orchestrate chat ask --agent-name <agent_name> "What is the weather?" --include-reasoning
+​
+Additional CLI chat options
+You can interact with agents directly from the CLI by using the orchestrate chat ask command.
+To see all available flags and options, run:
+BASH
+orchestrate chat ask --help
+​
+Capturing execution logs for custom agents
+For custom agents, you can capture and display execution logs by using the --capture-logs flag. It is useful for debugging and understanding agent behavior during execution.
+BASH
+orchestrate chat ask "what is python" \
+  --agent-name SimpleWxAIAgent \
+  -r \
+  --capture-logs
+​
+Continuing an existing conversation by using a thread ID
+To continue an existing conversation, use the --thread-id flag. It allows the agent to maintain conversational context across multiple requests.
+BASH
+orchestrate chat ask \
+  --agent-name customer_care_agent \
+  --thread-id <thread-id> \
+  "give me more information on claim CLM1234567"
+​
+Running flow agents from the CLI
+The CLI now supports flow agents. From a user perspective, you can run flow agents the same way as other agents.
+BASH
+orchestrate chat ask \
+  --agent-name various_outputs_agent \
+  "flow" \
+  -r
+​
+Uploading and downloading files during chat
+Agents that require file input or output now support file upload and download capabilities through the CLI.
+When an agent requests a file upload or download, the CLI prompts you to provide the local directory path for the file to upload or the destination directory for downloaded files.
+File prompts appear only when the agent workflow requires file interaction.
+Importing and deploying agents
+Previous

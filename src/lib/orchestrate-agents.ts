@@ -5,8 +5,8 @@ export type OrchestrateAgentId =
   | "routing_pivt"
   | "facility_pivt"
   | "optimizing_pivt"
-  | "cost_pivt"
   | "driver_pivt"
+  | "disaster_management_pivt"
   | "eis_orchestrator";
 
 export interface OrchestrateAgentMeta {
@@ -37,16 +37,9 @@ export const ORCHESTRATE_AGENTS: OrchestrateAgentMeta[] = [
   {
     id: "optimizing_pivt",
     displayName: "Optimizing Pivt",
-    role: "Route options engine",
+    role: "Route options & financial guardrail",
     accent: "from-sky-500/25 to-blue-600/15",
-    runBlurb: "Three route options for the active scenario",
-  },
-  {
-    id: "cost_pivt",
-    displayName: "Cost Pivt",
-    role: "Financial guardrail",
-    accent: "from-emerald-500/25 to-teal-600/15",
-    runBlurb: "SLA penalty vs route premiums — recommendation",
+    runBlurb: "Route bundle plus SLA penalty vs premiums",
   },
   {
     id: "driver_pivt",
@@ -54,6 +47,13 @@ export const ORCHESTRATE_AGENTS: OrchestrateAgentMeta[] = [
     role: "Driver & customer voice",
     accent: "from-rose-500/25 to-pink-600/15",
     runBlurb: "CRM contacts + customer notice draft",
+  },
+  {
+    id: "disaster_management_pivt",
+    displayName: "Disaster Management Pivt",
+    role: "EM & continuity overlay",
+    accent: "from-red-500/20 to-orange-600/15",
+    runBlurb: "ICS-style staging, continuity, escalation framing",
   },
   {
     id: "eis_orchestrator",

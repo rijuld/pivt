@@ -107,6 +107,8 @@ function ensureShipmentGeoColumns(db: Database.Database) {
   add("route_variants_json", "TEXT");
   add("crm_timeline_json", "TEXT");
   add("drop_offs_json", "TEXT");
+  add("optimizing_selected_route", "TEXT");
+  add("optimizing_route_opt_out", "INTEGER NOT NULL DEFAULT 0");
 }
 
 export interface ScenarioSettings {
@@ -197,6 +199,8 @@ function activeShipmentToParams(s: ActiveShipment) {
     route_variants_json: s.routeVariantsJson,
     crm_timeline_json: s.crmTimelineJson,
     drop_offs_json: s.dropOffsJson,
+    optimizing_selected_route: s.optimizingSelectedRoute,
+    optimizing_route_opt_out: s.optimizingRouteOptOut ? 1 : 0,
   };
 }
 
@@ -288,6 +292,7 @@ function migrate(db: Database.Database) {
     ensureOptionalShipmentColumns(db);
     ensureShipmentGeoColumns(db);
     ensureCompanyProfileTable(db);
+    ensureShipRouteRevisionsTable(db);
     return;
   }
 
@@ -376,6 +381,218 @@ function migrate(db: Database.Database) {
   ensureOptionalShipmentColumns(db);
   ensureShipmentGeoColumns(db);
   ensureCompanyProfileTable(db);
+  ensureShipRouteRevisionsTable(db);
+  ensureDriverRouteAckTable(db);
+}
+
+function ensureShipRouteRevisionsTable(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ship_route_revisions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ship_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      summary TEXT NOT NULL,
+      drop_offs_json TEXT,
+      optimizing_selected_route TEXT,
+      optimizing_route_opt_out INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_ship_route_revisions_ship
+      ON ship_route_revisions(ship_id, id DESC);
+  `);
+}
+
+function ensureDriverRouteAckTable(db: Database.Database) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS driver_route_notice_ack (
+      ship_id TEXT PRIMARY KEY,
+      route_fingerprint TEXT NOT NULL,
+      acknowledged_at TEXT NOT NULL
+    );
+  `);
+}
+
+export type DriverRouteNoticeAck = {
+  fingerprint: string;
+  acknowledgedAt: string;
+};
+
+export function getDriverRouteNoticeAck(
+  shipId: string,
+): DriverRouteNoticeAck | null {
+  const db = getDb();
+  ensureDriverRouteAckTable(db);
+  const row = db
+    .prepare(
+      `SELECT route_fingerprint, acknowledged_at FROM driver_route_notice_ack WHERE ship_id = ?`,
+    )
+    .get(shipId) as
+    | { route_fingerprint: string; acknowledged_at: string }
+    | undefined;
+  if (!row) return null;
+  return {
+    fingerprint: row.route_fingerprint,
+    acknowledgedAt: row.acknowledged_at,
+  };
+}
+
+export function setDriverRouteNoticeAck(
+  shipId: string,
+  fingerprint: string,
+): DriverRouteNoticeAck {
+  const db = getDb();
+  ensureDriverRouteAckTable(db);
+  const acknowledgedAt = new Date().toISOString();
+  db.prepare(
+    `
+    INSERT INTO driver_route_notice_ack (ship_id, route_fingerprint, acknowledged_at)
+    VALUES (@ship_id, @route_fingerprint, @acknowledged_at)
+    ON CONFLICT(ship_id) DO UPDATE SET
+      route_fingerprint = excluded.route_fingerprint,
+      acknowledged_at = excluded.acknowledged_at
+  `,
+  ).run({
+    ship_id: shipId,
+    route_fingerprint: fingerprint,
+    acknowledged_at: acknowledgedAt,
+  });
+  return { fingerprint, acknowledgedAt };
+}
+
+export type ShipRouteRevision = {
+  id: number;
+  shipId: string;
+  createdAt: string;
+  summary: string;
+  dropOffsJson: string | null;
+  optimizingSelectedRoute: string | null;
+  optimizingRouteOptOut: boolean;
+};
+
+function routeSnapshotsEqual(a: ActiveShipment, b: ActiveShipment): boolean {
+  return (
+    a.dropOffsJson === b.dropOffsJson &&
+    a.optimizingSelectedRoute === b.optimizingSelectedRoute &&
+    a.optimizingRouteOptOut === b.optimizingRouteOptOut
+  );
+}
+
+function revisionSummaryFromDiff(
+  prev: ActiveShipment,
+  next: ActiveShipment,
+): string {
+  const parts: string[] = [];
+  if (prev.dropOffsJson !== next.dropOffsJson) {
+    parts.push("Delivery stops updated");
+  }
+  if (prev.optimizingSelectedRoute !== next.optimizingSelectedRoute) {
+    if (next.optimizingSelectedRoute) {
+      parts.push(`Route ${next.optimizingSelectedRoute} committed`);
+    } else if (prev.optimizingSelectedRoute) {
+      parts.push("Committed route cleared");
+    }
+  }
+  if (prev.optimizingRouteOptOut !== next.optimizingRouteOptOut) {
+    parts.push(next.optimizingRouteOptOut ? "Route opt-out set" : "Route opt-out cleared");
+  }
+  return parts.length > 0 ? parts.join(" · ") : "Route settings updated";
+}
+
+function insertRouteRevision(
+  db: Database.Database,
+  shipId: string,
+  ship: ActiveShipment,
+  summary: string,
+) {
+  ensureShipRouteRevisionsTable(db);
+  db.prepare(
+    `
+    INSERT INTO ship_route_revisions (
+      ship_id, summary, drop_offs_json, optimizing_selected_route, optimizing_route_opt_out
+    ) VALUES (@ship_id, @summary, @drop_offs_json, @optimizing_selected_route, @optimizing_route_opt_out)
+  `,
+  ).run({
+    ship_id: shipId,
+    summary,
+    drop_offs_json: ship.dropOffsJson,
+    optimizing_selected_route: ship.optimizingSelectedRoute,
+    optimizing_route_opt_out: ship.optimizingRouteOptOut ? 1 : 0,
+  });
+}
+
+export function listShipRouteRevisions(shipId: string): ShipRouteRevision[] {
+  const db = getDb();
+  ensureShipRouteRevisionsTable(db);
+  const rows = db
+    .prepare(
+      `SELECT id, ship_id, created_at, summary, drop_offs_json, optimizing_selected_route, optimizing_route_opt_out
+       FROM ship_route_revisions WHERE ship_id = ? ORDER BY id DESC`,
+    )
+    .all(shipId) as Array<{
+    id: number;
+    ship_id: string;
+    created_at: string;
+    summary: string;
+    drop_offs_json: string | null;
+    optimizing_selected_route: string | null;
+    optimizing_route_opt_out: number;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    shipId: r.ship_id,
+    createdAt: r.created_at,
+    summary: r.summary,
+    dropOffsJson: r.drop_offs_json,
+    optimizingSelectedRoute: r.optimizing_selected_route,
+    optimizingRouteOptOut: r.optimizing_route_opt_out === 1,
+  }));
+}
+
+/** Apply a stored revision and append a new history row describing the restore. */
+export function revertShipRouteToRevision(
+  shipId: string,
+  revisionId: number,
+): ActiveShipment | null {
+  const db = getDb();
+  ensureShipRouteRevisionsTable(db);
+  const row = db
+    .prepare(
+      `SELECT id, ship_id, created_at, summary, drop_offs_json, optimizing_selected_route, optimizing_route_opt_out
+       FROM ship_route_revisions WHERE id = ? AND ship_id = ?`,
+    )
+    .get(revisionId, shipId) as
+    | {
+        id: number;
+        ship_id: string;
+        created_at: string;
+        summary: string;
+        drop_offs_json: string | null;
+        optimizing_selected_route: string | null;
+        optimizing_route_opt_out: number;
+      }
+    | undefined;
+  if (!row) return null;
+
+  const ship = updateShip(
+    shipId,
+    {
+      dropOffsJson: row.drop_offs_json,
+      optimizingSelectedRoute: row.optimizing_selected_route,
+      optimizingRouteOptOut: row.optimizing_route_opt_out === 1,
+    },
+    { skipRouteRevision: true },
+  );
+  if (!ship) return null;
+
+  const run = db.transaction(() => {
+    insertRouteRevision(
+      db,
+      shipId,
+      ship,
+      `Restored snapshot #${row.id} (${row.created_at})`,
+    );
+  });
+  run();
+  return getShip(shipId);
 }
 
 function ensureCompanyProfileTable(db: Database.Database) {
@@ -440,6 +657,8 @@ function rowToShip(row: {
   route_variants_json?: string | null;
   crm_timeline_json?: string | null;
   drop_offs_json?: string | null;
+  optimizing_selected_route?: string | null;
+  optimizing_route_opt_out?: number | null;
 }): ActiveShipment {
   const fallback =
     row.origin_lng == null || row.dest_lng == null
@@ -486,6 +705,8 @@ function rowToShip(row: {
     routeVariantsJson: row.route_variants_json ?? null,
     crmTimelineJson: row.crm_timeline_json ?? null,
     dropOffsJson: row.drop_offs_json ?? null,
+    optimizingSelectedRoute: row.optimizing_selected_route ?? null,
+    optimizingRouteOptOut: (row.optimizing_route_opt_out ?? 0) === 1,
   };
 }
 
@@ -500,12 +721,14 @@ function seedIfEmpty(db: Database.Database) {
       driver_name, driver_phone, driver_email, driver_org, dispatcher_name, dispatcher_phone, dispatcher_email, dispatcher_org,
       origin_lng, origin_lat, dest_lng, dest_lat, origin_label, dest_label,
       hub_lng, hub_lat, hub_label, stall_lng, stall_lat, alt_waypoint_lng, alt_waypoint_lat,
-      priority, cargo, sla_penalty_per_hour, original_eta, blizzard_corridor, route_variants_json, crm_timeline_json, drop_offs_json)
+      priority, cargo, sla_penalty_per_hour, original_eta, blizzard_corridor, route_variants_json, crm_timeline_json, drop_offs_json,
+      optimizing_selected_route, optimizing_route_opt_out)
     VALUES (@id, @state, @region, @route_from, @route_to, @status, @is_primary, @notes, @carrier, @equipment, @customer_ref,
       @driver_name, @driver_phone, @driver_email, @driver_org, @dispatcher_name, @dispatcher_phone, @dispatcher_email, @dispatcher_org,
       @origin_lng, @origin_lat, @dest_lng, @dest_lat, @origin_label, @dest_label,
       @hub_lng, @hub_lat, @hub_label, @stall_lng, @stall_lat, @alt_waypoint_lng, @alt_waypoint_lat,
-      @priority, @cargo, @sla_penalty_per_hour, @original_eta, @blizzard_corridor, @route_variants_json, @crm_timeline_json, @drop_offs_json)
+      @priority, @cargo, @sla_penalty_per_hour, @original_eta, @blizzard_corridor, @route_variants_json, @crm_timeline_json, @drop_offs_json,
+      @optimizing_selected_route, @optimizing_route_opt_out)
   `);
 
   const run = db.transaction(() => {
@@ -534,6 +757,94 @@ function backfillDropOffsFromSeeds(db: Database.Database) {
   }
 }
 
+/** One-time: demo driver + dispatcher names/phones from ``SHIP_SEED_ROWS`` (replaces null / placeholders). */
+const MIGRATION_SEED_CRM_CONTACTS_KEY = "migration_seed_crm_contacts_20260412";
+
+function migrateSeedCrmContactsFromSeeds(db: Database.Database) {
+  ensureAppKvTable(db);
+  const done = db
+    .prepare(`SELECT 1 FROM app_kv WHERE key = ?`)
+    .get(MIGRATION_SEED_CRM_CONTACTS_KEY) as { 1: number } | undefined;
+  if (done) return;
+
+  const updDriver = db.prepare(`
+    UPDATE ships SET
+      driver_name = @driver_name,
+      driver_phone = @driver_phone,
+      driver_email = @driver_email,
+      driver_org = @driver_org
+    WHERE id = @id AND (
+      driver_name IS NULL
+      OR TRIM(COALESCE(driver_name, '')) = ''
+      OR driver_name = 'Assigned driver'
+    )
+  `);
+  const updDispatch = db.prepare(`
+    UPDATE ships SET
+      dispatcher_name = @dispatcher_name,
+      dispatcher_phone = @dispatcher_phone,
+      dispatcher_email = @dispatcher_email,
+      dispatcher_org = @dispatcher_org
+    WHERE id = @id AND (
+      dispatcher_name IS NULL
+      OR TRIM(COALESCE(dispatcher_name, '')) = ''
+      OR dispatcher_name = 'Floor dispatch'
+    )
+  `);
+
+  const mark = db.prepare(
+    `INSERT INTO app_kv (key, value) VALUES (?, ?)`,
+  );
+  const run = db.transaction(() => {
+    for (const seed of SHIP_SEED_ROWS) {
+      if (!seed.driverName?.trim()) continue;
+      const p = activeShipmentToParams(seed);
+      updDriver.run({
+        id: p.id,
+        driver_name: p.driver_name,
+        driver_phone: p.driver_phone,
+        driver_email: p.driver_email,
+        driver_org: p.driver_org,
+      });
+      updDispatch.run({
+        id: p.id,
+        dispatcher_name: p.dispatcher_name,
+        dispatcher_phone: p.dispatcher_phone,
+        dispatcher_email: p.dispatcher_email,
+        dispatcher_org: p.dispatcher_org,
+      });
+    }
+    mark.run(MIGRATION_SEED_CRM_CONTACTS_KEY, "1");
+  });
+  run();
+}
+
+/** One-time: push multi mid-destination drop_offs_json from seeds to all known demo loads. */
+const MIGRATION_MULTI_MID_DROPOFFS_KEY = "migration_drop_offs_multi_mid_20260412";
+
+function migrateMultiMidDropOffsFromSeeds(db: Database.Database) {
+  ensureAppKvTable(db);
+  const done = db
+    .prepare(`SELECT 1 FROM app_kv WHERE key = ?`)
+    .get(MIGRATION_MULTI_MID_DROPOFFS_KEY) as { 1: number } | undefined;
+  if (done) return;
+
+  const stmt = db.prepare(
+    `UPDATE ships SET drop_offs_json = @drop_offs_json WHERE id = @id`,
+  );
+  const mark = db.prepare(
+    `INSERT INTO app_kv (key, value) VALUES (?, ?)`,
+  );
+  const run = db.transaction(() => {
+    for (const seed of SHIP_SEED_ROWS) {
+      if (!seed.dropOffsJson) continue;
+      stmt.run({ id: seed.id, drop_offs_json: seed.dropOffsJson });
+    }
+    mark.run(MIGRATION_MULTI_MID_DROPOFFS_KEY, "1");
+  });
+  run();
+}
+
 export function getDb(): Database.Database {
   if (dbInstance) return dbInstance;
   ensureDataDir();
@@ -543,6 +854,8 @@ export function getDb(): Database.Database {
   seedIfEmpty(db);
   backfillShipmentGeometry(db);
   backfillDropOffsFromSeeds(db);
+  migrateMultiMidDropOffsFromSeeds(db);
+  migrateSeedCrmContactsFromSeeds(db);
   seedScenarioSettingsIfEmpty(db);
   dbInstance = db;
   return db;
@@ -555,7 +868,8 @@ const SHIP_SELECT = `
   dispatcher_name, dispatcher_phone, dispatcher_email, dispatcher_org,
   origin_lng, origin_lat, dest_lng, dest_lat, origin_label, dest_label,
   hub_lng, hub_lat, hub_label, stall_lng, stall_lat, alt_waypoint_lng, alt_waypoint_lat,
-  priority, cargo, sla_penalty_per_hour, original_eta, blizzard_corridor, route_variants_json, crm_timeline_json, drop_offs_json
+  priority, cargo, sla_penalty_per_hour, original_eta, blizzard_corridor, route_variants_json, crm_timeline_json, drop_offs_json,
+  optimizing_selected_route, optimizing_route_opt_out
 `;
 
 type ShipSqlRow = Parameters<typeof rowToShip>[0];
@@ -604,12 +918,14 @@ export function insertShip(input: ActiveShipment): ActiveShipment {
         driver_name, driver_phone, driver_email, driver_org, dispatcher_name, dispatcher_phone, dispatcher_email, dispatcher_org,
         origin_lng, origin_lat, dest_lng, dest_lat, origin_label, dest_label,
         hub_lng, hub_lat, hub_label, stall_lng, stall_lat, alt_waypoint_lng, alt_waypoint_lat,
-        priority, cargo, sla_penalty_per_hour, original_eta, blizzard_corridor, route_variants_json, crm_timeline_json, drop_offs_json)
+        priority, cargo, sla_penalty_per_hour, original_eta, blizzard_corridor, route_variants_json, crm_timeline_json, drop_offs_json,
+        optimizing_selected_route, optimizing_route_opt_out)
       VALUES (@id, @state, @region, @route_from, @route_to, @status, @is_primary, @notes, @carrier, @equipment, @customer_ref,
         @driver_name, @driver_phone, @driver_email, @driver_org, @dispatcher_name, @dispatcher_phone, @dispatcher_email, @dispatcher_org,
         @origin_lng, @origin_lat, @dest_lng, @dest_lat, @origin_label, @dest_label,
         @hub_lng, @hub_lat, @hub_label, @stall_lng, @stall_lat, @alt_waypoint_lng, @alt_waypoint_lat,
-        @priority, @cargo, @sla_penalty_per_hour, @original_eta, @blizzard_corridor, @route_variants_json, @crm_timeline_json, @drop_offs_json)
+        @priority, @cargo, @sla_penalty_per_hour, @original_eta, @blizzard_corridor, @route_variants_json, @crm_timeline_json, @drop_offs_json,
+        @optimizing_selected_route, @optimizing_route_opt_out)
     `,
     ).run(activeShipmentToParams(merged));
   });
@@ -620,6 +936,7 @@ export function insertShip(input: ActiveShipment): ActiveShipment {
 export function updateShip(
   id: string,
   patch: Partial<Omit<ActiveShipment, "id">>,
+  opts?: { skipRouteRevision?: boolean },
 ): ActiveShipment | null {
   const db = getDb();
   const existing = getShip(id);
@@ -676,10 +993,23 @@ export function updateShip(
         blizzard_corridor = @blizzard_corridor,
         route_variants_json = @route_variants_json,
         crm_timeline_json = @crm_timeline_json,
-        drop_offs_json = @drop_offs_json
+        drop_offs_json = @drop_offs_json,
+        optimizing_selected_route = @optimizing_selected_route,
+        optimizing_route_opt_out = @optimizing_route_opt_out
       WHERE id = @id
     `,
     ).run(activeShipmentToParams(next));
+    if (
+      !opts?.skipRouteRevision &&
+      !routeSnapshotsEqual(existing, next)
+    ) {
+      insertRouteRevision(
+        db,
+        id,
+        next,
+        revisionSummaryFromDiff(existing, next),
+      );
+    }
   });
   run();
   return getShip(id);
@@ -687,8 +1017,17 @@ export function updateShip(
 
 export function deleteShip(id: string): boolean {
   const db = getDb();
-  const r = db.prepare("DELETE FROM ships WHERE id = ?").run(id);
-  return r.changes > 0;
+  ensureShipRouteRevisionsTable(db);
+  ensureDriverRouteAckTable(db);
+  let removed = false;
+  const run = db.transaction(() => {
+    db.prepare("DELETE FROM ship_route_revisions WHERE ship_id = ?").run(id);
+    db.prepare("DELETE FROM driver_route_notice_ack WHERE ship_id = ?").run(id);
+    const r = db.prepare("DELETE FROM ships WHERE id = ?").run(id);
+    removed = r.changes > 0;
+  });
+  run();
+  return removed;
 }
 
 function rowToCompanyProfile(row: {
@@ -781,4 +1120,28 @@ export function updateCompanyProfile(
     updated_at: next.updatedAt,
   });
   return getCompanyProfile();
+}
+
+const WEATHER_EVENTS_SNAPSHOT_KEY = "weather_events_snapshot";
+
+/** Persist last successful ``GET /api/weather-events`` JSON for offline path / attention UI. */
+export function saveWeatherEventsSnapshot(payloadJson: string): void {
+  const db = getDb();
+  ensureAppKvTable(db);
+  db.prepare(
+    `
+    INSERT INTO app_kv (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `,
+  ).run(WEATHER_EVENTS_SNAPSHOT_KEY, payloadJson);
+}
+
+/** Raw JSON from ``saveWeatherEventsSnapshot``, or null if never refreshed. */
+export function getWeatherEventsSnapshot(): string | null {
+  const db = getDb();
+  ensureAppKvTable(db);
+  const row = db
+    .prepare(`SELECT value FROM app_kv WHERE key = ?`)
+    .get(WEATHER_EVENTS_SNAPSHOT_KEY) as { value: string } | undefined;
+  return row?.value ?? null;
 }

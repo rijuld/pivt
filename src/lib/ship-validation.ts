@@ -160,6 +160,8 @@ export function parseCreateShip(
       routeVariantsJson: optNullableString(body.routeVariantsJson),
       crmTimelineJson: optNullableString(body.crmTimelineJson),
       dropOffsJson: dropParsed.value,
+      optimizingSelectedRoute: null,
+      optimizingRouteOptOut: false,
     },
   };
 }
@@ -327,6 +329,28 @@ export function parsePatchShip(
     );
     if (!dropParsed.ok) return { ok: false, error: dropParsed.error };
     out.dropOffsJson = dropParsed.value;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "optimizingSelectedRoute")) {
+    const v = body.optimizingSelectedRoute;
+    if (v === null) {
+      out.optimizingSelectedRoute = null;
+    } else if (typeof v === "string") {
+      const t = v.trim().toUpperCase();
+      if (t.length !== 1 || t < "A" || t > "Z") {
+        return {
+          ok: false,
+          error: "optimizingSelectedRoute must be a single letter A–Z or null.",
+        };
+      }
+      out.optimizingSelectedRoute = t;
+    } else {
+      return { ok: false, error: "optimizingSelectedRoute must be a string or null." };
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, "optimizingRouteOptOut")) {
+    out.optimizingRouteOptOut = Boolean(body.optimizingRouteOptOut);
   }
 
   if (Object.keys(out).length === 0) {

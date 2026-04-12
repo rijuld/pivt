@@ -1,0 +1,454 @@
+Creating connections
+Connections are composed of three parts:
+Application ID (app_id): A unique identifier that distinguishes the connection within your environment.
+Environment-specific configuration: Define separate configurations for the draft and live states of an agent. Each configuration specifies:
+The type of credentials used (for example, Basic Auth, Bearer Token, API Key)
+Whether the credentials are scoped to individual users (member) or shared across the organization (team)
+Credentials:
+For team connections, builders set the credentials, and all users share them across the instance.
+For member connections, users are prompted in the chat to enter their credentials if they haven’t already provided them.
+​
+Adding and configuring connections
+You can add and configure connections in two ways:
+Use a combination of the connections add and connections configure commands to define and set up connections manually.
+Import connections from a YAML file, just like other watsonx Orchestrate resources.
+Importing from a file
+Using the CLI only
+You can create and import connection configurations using YAML files, which makes it easier to share setup details across users. However, you must set credentials separately using the CLI. This requirement helps prevent storing sensitive information like passwords in unsecured files.
+In your YAML specification file, define the connection’s structure, including:
+Application ID (app_id)
+Authentication type
+Environment-specific settings (e.g., draft vs. live)
+Credential scope (member or team)
+YAML
+spec_version: v1
+kind: connection
+app_id: my_app
+resource:
+    component: knowledge
+    category: milvus
+environments:
+    draft:  # in draft each person needs to provide their own basic credentials
+        kind: basic
+        type: team
+        server_url: https://example.com/
+    live:
+        kind: api_key # note it's possible to auth different in the deployed live agent vs the draft agent
+        type: member
+        server_url: https://example.com/
+Show detailed flag descriptions
+
+To import this connection, run:
+BASH
+orchestrate connections import -f my_app.yaml
+​
+Example connection configuration files per type
+Basic Connections
+
+Bearer Connections
+
+API Key Connections
+
+Key Value Connections
+
+OAuth auth code flow
+
+🚧 OAuth auth implicit flow
+
+OAuth auth password flow
+
+OAuth auth client credentials flow
+
+SSO / IDP auth (on behalf of single exchange)
+
+🌐 SSO / IDP auth (on behalf of flow)
+
+​
+Setting Credentials
+Once a connection has been configured, you can set its credentials using either the CLI or the UI.
+​
+Setting credentials via the UI
+Once you’ve added a connection, you can manage its credentials through the Connections Management UI, located under Manage → Connections.
+For member connections, each end user sets their own credentials through this interface.
+Connections UI
+Connections UI
+
+Note: In the watsonx Orchestrate Developer Edition, you can only set credentials using the CLI. The UI does not support credential management in this edition. As a result, you can only fully configure OAuth connections in the SaaS or on-premises offerings, where both CLI and UI credential setup are supported.
+​
+Setting credentials via the CLI
+Alternatively, you can set connection credentials via the CLI to more easily script agent setup.
+​
+Basic Connections
+BASH
+orchestrate connections set-credentials -a application_id \
+  --env draft \
+  -u username \
+  -p password
+Show command flags
+
+​
+Bearer Connections
+BASH
+orchestrate connections set-credentials -a application_id \
+  --env draft \
+  --token thebearertoken
+Show command flags
+
+​
+API Key Connections
+BASH
+orchestrate connections set-credentials -a application_id \
+  --env draft \
+  --api-key theapikey
+Show command flags
+
+​
+Key Value Connections
+BASH
+orchestrate connections set-credentials -a application_id \
+  --env draft \
+  -e 'key1=value1' \
+  -e 'key2=value2'
+Show command flags
+
+​
+OAuth
+OAuth supports multiple authentication flows, as outlined in the OpenAPI specification. watsonx Orchestrate can use these flows to generate authentication tokens for compatible downstream consumers.
+Unlike other authentication methods, such as Basic Auth or API Key, where tools receive the same credentials that were configured, OAuth connections dynamically resolve an access_token within Orchestrate. The platform generates this token on behalf of the tool and securely provides it during execution.
+Auth Code Flow
+BASH
+orchestrate connections set-credentials -a application_id \
+  --env draft \
+  --client-id 'clientid' \
+  --client-secret 'clientsecret' \
+  --authorization-url 'https://api.example.com/oauth2/authorize' \
+  --token-url 'https://api.example.com/oauth2/token' \
+  --scope admin
+Show command flags
+
+🚧 Implicit flow
+Currently, watsonx Orchestrate does not support OAuth implicit flows.  Support for this feature is coming soon.
+Password flow
+BASH
+orchestrate connections set-credentials -a application_id \
+  --env draft \
+  --client-id 'clientid' \
+  --client-secret 'clientsecret' \
+  --username 'username' \
+  --password 'password' \
+  --token-url 'https://api.example.com/oauth2/token' \
+  --scope admin
+Show command flags
+
+Client Credentials flow
+BASH
+orchestrate connections set-credentials -a application_id \
+  --env draft \
+  --client-id 'clientid' \
+  --client-secret 'clientsecret' \
+  --token-url 'https://api.example.com/oauth2/token' \
+  --scope admin
+Show command flags
+
+​
+🌐 SSO / IDP auth (on behalf of single exchange)
+Single exchange uses the OAuth Token Exchange grant to perform a one-time delegated exchange on behalf of the user. It’s ideal for lightweight actions that need temporary, delegated access without establishing a persistent session.
+BASH
+orchestrate connections set-credentials \
+  -a my_app \
+  --env draft \
+  --grant-type "urn:ietf:params:oauth:grant-type:token-exchange" \
+  --client-id "<client_id>" \
+  --token-url "<token_url>"
+Show command flags
+
+​
+🌐 SSO / IDP auth (on behalf of flow)
+BASH
+orchestrate connections set-identity-provider --app-id workday \
+  --env draft \
+  --url https://idp-server/oauth2/v2.0/token \
+  --client-id clientid \
+  --client-secret clientsecret \
+  --scope scope \
+  --grant-type urn:ietf:params:oauth:grant-type:jwt-bearer
+Show command flags
+
+BASH
+orchestrate connections set-credentials --app-id workday \
+  --env draft \
+  --client-id clientid \
+  --token-url https://token-server/ccx/oauth2/ibmsrv_dpt1/token \
+  --grant-type urn:ietf:params:oauth:grant-type:saml2-bearer
+
+
+Why use connections
+A connection represents a dependency on an external application or service. It contains all the necessary information for agents, tools, knowledge bases, or virtual models to securely authenticate and interact with that external system.
+​
+Types of connections
+watsonx Orchestrate supports several types of authentication methods:
+Basic, Bearer, and API Key: These methods pass the configured credentials directly to the consuming tool or service.
+OAuth: Orchestrate supports multiple OAuth flows, as defined in the OpenAPI specification. When using OAuth:
+Orchestrate authenticates the user interactively.
+It generates an access_token on behalf of the user.
+This token is securely passed to the downstream tool during execution.
+OAuth-based connections currently only work when the user interacts with the agent through the watsonx Orchestrate UI (not embedded web chat).
+When you embed web chat in an external website, Orchestrate supports integration with upstream SSO/IDP providers such as Azure AD, Workday CCX, and others.
+Orchestrate also supports Key-Value connections, which allow builders to provide a secure dictionary of keys and values to downstream tools. You can use these connections to:
+Pass arbitrary authentication configurations to Python tools.
+Securely provide environment variables to MCP toolkits.
+Configure connections to LLM providers through the AI Gateway.
+Legend
+✅ Supported ❌ Not supported 🚧 Partially supported (native agents only)
+​
+Support by tool type
+Authentication Kind	Python	OpenAPI	Agentic workflows [1]	Local MCP Toolkits	Remote MCP Toolkits	Langflow
+Basic Auth	✅	✅	✅	❌	✅	❌
+Bearer Token	✅	✅	✅	❌	✅	❌
+API Key	✅	✅	✅	❌	✅	❌
+OAuth (Client Credentials) [2]	✅	✅	✅	❌	✅	❌
+OAuth (Auth Code) [2]	✅	✅	✅	❌	✅	❌
+OAuth (Implicit) [2]	🚧	🚧	✅	❌	❌	❌
+OAuth (Password) [2]	✅	✅	✅	❌	✅	❌
+OAuth (SSO/IDP Flow) [3]	✅	✅	✅	❌	❌	❌
+Key-Value	✅	❌	✅	✅	❌	✅
+[1] Tools built using Agentic workflows do not require connection support as connections within Agentic workflows are configured via their downstream component tools.
+[2] OAuth connections are currently only supported by agents in the watsonx Orchestrate integrated web chat ui.
+[3] SSO/ IDP connections are only supported by agents in web chat embedded into a customer’s website.
+​
+Support for knowledge
+Authentication Kind	Milvus	Elastic Search	Custom Search
+Basic Auth	✅	✅	✅
+Bearer Token	❌	❌	❌
+API Key	❌	✅	✅
+OAuth (Client Credentials) [2]	❌	❌	❌
+OAuth (Auth Code) [2]	❌	❌	❌
+OAuth (Implicit) [2]	❌	❌	❌
+OAuth (Password) [2]	❌	❌	❌
+OAuth (SSO/IDP Flow) [3]	❌	❌	❌
+Key-Value	❌	❌	❌
+​
+Support for member vs team
+Authentication Kind	member (per user)	team (shared)
+Basic Auth	✅	✅
+Bearer Token	✅	✅
+API Key	✅	✅
+OAuth (Client Credentials)	✅	✅
+OAuth (Auth Code)	✅	✅
+OAuth (Implicit)	🚧	🚧
+OAuth (Password)	✅	✅
+OAuth (SSO/IDP Flow)	✅	✅
+Key-Value	❌	✅
+​
+Support for AI Gateway
+The AI Gateway supports only key-value connections.
+Managing toolkits
+Previous
+Creating connections
+Associating connections to OpenAPI tools
+​
+Importing an OpenAPI tool with connections
+To associate an OpenAPI tool to a connection, simply specify the application id with the -a flag. OpenAPI tools support only one connection per server.
+To support multiple connections or non-standard headers, use a python tool.
+BASH
+orchestrate tools import -k openapi -f my_tool.py -a app_1
+​
+How each authentication type is injected at runtime
+​
+Basic Connections
+API Keys will be injected in the headers of a request as:
+Authorization: Basic {base64encoded(username:password)}
+​
+Bearer Connections
+Bearer tokens will be injected in the headers of a request as:
+Authorization: Bearer {token}
+​
+API Key Connections
+API Keys will be injected in the headers of a request as:
+x-api-key: {api_key}
+​
+OAuth (all)
+OAuth connections will be injected in the headers of a request as:
+Authorization: Bearer {access_token}
+​
+Key Value Connections
+Key value connections are not supported.
+
+Associating connections to Python tools
+​
+Defining a python tools expected credentials
+When building Python tools that consume connections, you must explicitly define each expected connection in the expected_credentials array within the @tool decorator.
+If your Python file includes multiple tools, each tool must declare its own expected_credentials. This ensures that the tool can fetch the necessary connections during execution. Include all connections used directly within the tool function, as well as those used in any helper functions the tool calls.
+If you attempt to import a tool with a connection type that doesn’t match one of the expected types for the specified app_id, the orchestrate tools import command will fail and prevent the tool from being imported.
+PYTHON
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+from ibm_watsonx_orchestrate.agent_builder.connections import ConnectionType
+from ibm_watsonx_orchestrate.run import connections
+
+MY_APP_ID='app-id'
+
+@tool(
+    expected_credentials=[
+        {"app_id": MY_APP_ID, "type": ConnectionType.API_KEY_AUTH}
+    ]
+)
+def my_tool():
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+    }
+
+    connection_type = connections.connection_type(MY_APP_ID2)
+    conn = connections.api_key_auth(MY_APP_ID2)
+    url = conn.url
+    headers['x-api-key'] = conn.api_key
+
+    response = requests.post(
+        url,
+        headers=headers,
+        json={}
+    )
+    response.raise_for_status()
+    return response.json()['result']
+​
+Examples of fetching credentials per connection type
+Here’s an example that shows how to look up connection credentials for each credential type:
+Basic Connections
+
+Bearer Connections
+
+API Key Connections
+
+OAuth (Client Credentials)
+
+OAuth (Auth Code)
+
+🚧 OAuth (Implicit)
+
+OAuth (Password)
+
+🌐OAuth (SSO/IDP Flow)
+
+Key Value Connections
+
+​
+Combining multiple connection types for a single application id
+You can define multiple authentication types for a single app_id, which is useful when using different methods in different environments—for example, basic authentication in draft mode and OAuth in production.
+To support this, provide an array of credential types in the expected_credentials field instead of a single type. At runtime, your Python tool must determine which connection type to use by calling:
+PYTHON
+connections.connection_type('my-app')
+Make sure the tool handles disambiguation logic appropriately. If the connection type provided during import doesn’t match any of the expected types for the specified app_id, the orchestrate tools import command will fail and block the import.
+PYTHON
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+from ibm_watsonx_orchestrate.agent_builder.connections import ConnectionType
+from ibm_watsonx_orchestrate.run import connections
+
+MY_APP_ID='app-id'
+MY_APP_ID2='app-id-2'
+
+@tool(
+    expected_credentials=[
+        {"app_id": MY_APP_ID, "type": ConnectionType.KEY_VALUE},
+        {"app_id": MY_APP_ID2, "type": [ConnectionType.API_KEY_AUTH, ConnectionType.OAUTH2_CLIENT_CREDS]}
+    ]
+)
+def my_tool():
+    headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+        # key value connections hold any arbitrary dictionary of keys and values
+        'x-client-id': connections.key_value(MY_APP_ID)['client-id']
+    }
+
+
+    url = None
+    connection_type = connections.connection_type(MY_APP_ID2)
+    if connection_type == ConnectionType.API_KEY_AUTH:
+        conn = connections.api_key_auth(MY_APP_ID2)
+        url = conn.url
+        headers['x-api-key'] = conn.api_key
+    elif connection_type == ConnectionType.OAUTH2_CLIENT_CREDS:
+        # oauth connections contain a url and an access token generated within orchestrate and exposed to your tool
+        url = conn.url
+        conn = connections.oauth2_client_creds(MY_APP_ID2)
+        headers['Authorization'] = f"Bearer {conn.access_token}"
+    else:
+        raise ValueError(f"Unexpected connection type {connection_type} for {MY_APP_ID2}")
+
+    response = requests.post(
+        url,
+        headers=headers,
+        json={}
+    )
+    response.raise_for_status()
+    return response.json()['result']
+​
+Importing tools using connections
+To import a Python tool that uses connections, use the -a app_id flag to bind each connection to the tool:
+BASH
+orchestrate tools import -k python \
+  -f my_tool.py \
+  -a app_1 \
+  -a app_2
+If your tool expects a specific connection ID in your file, but the actual connection in Orchestrate uses a different name, you can remap it using the -a flag:
+BASH
+orchestrate tools import -k python \
+  -f my_tool.py \
+  -a app_id_in_tool=app_id_in_orchestrate
+​
+Additional functionality of python tools
+​
+Locally emulating python tool connections
+When debugging Python tools outside watsonx Orchestrate, you can run them locally by emulating the environment variables that Orchestrate sets at runtime. These variables expose connection credentials to your tool, allowing you to test functionality without deploying the tool. Orchestrate uses the following naming convention to expose connections:
+BASH
+export WXO_SECURITY_SCHEMA_<my_app_id>=<connection_type>
+export WXO_CONNECTION_<my_app_id>_<field>=<value>
+For example, to simulate a connection that uses an API key:
+BASH
+export WXO_SECURITY_SCHEMA_my_app=api_key_auth
+export WXO_CONNECTION_my_app_api_key=your_api_key_here
+Set these environment variables before running your script to replicate how Orchestrate injects credentials during execution.
+Basic Connections
+
+Bearer Connections
+
+API Key Connections
+
+OAuth (Client Credentials)
+
+OAuth (Auth Code)
+
+🚧 OAuth (Implicit)
+
+OAuth (Password)
+
+🌐 OAuth (SSO/IDP Flow)
+
+Key Value Connections
+
+Note: The app_id must be sanitized by replacing any character that is not alphanumeric (a-z, A-Z, 0-9) with an underscore (_).
+PYTHON
+sanitize_pattern = re.compile(r"[^a-zA-Z0-9]+")
+sanitized_app_id = re.sub(sanitize_pattern,'_', app_id)
+Associating connections to OpenAPI tools
+Previous
+
+
+
+Associating connections to Custom agents
+Unlike other agents, you associate a connection to a custom agent through the orchestrate agents experimental-connect command. The process for creating a connection stays the same.
+BASH
+orchestrate agents experimental-connect -n <custom agent name> -c <connection ID>
+Show command flags
+
+watsonx Orchestrate uses your connection to set custom agent credentials. It injects your credential key at runtime. It follows the format:
+{connection_app_id}_{credential_type}
+Where:
+connection_app_id is the unique ID of your connection app.
+credential_type is the value you set with the -k parameter when you configure the connection.
+For example, when you run:
+BASH
+orchestrate connections configure --app-id openai_api --environment draft -t team -k api_key
+Your credential key becomes:
+openai_api_api_key
+For more details on creating and configuring connections, see Creating connections.

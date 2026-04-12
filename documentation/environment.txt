@@ -1,0 +1,208 @@
+Configure access to remote environments
+The watsonx Orchestrate ADK introduces environments (env), which represent instances of watsonx Orchestrate you can access.
+Environments can be:
+Local: Running on your laptop using the Developer Edition of watsonx Orchestrate.
+Remote: Hosted on IBM Cloud, AWS, or on-premises using Cloud Pak for Data.
+When you activate an environment, all commands, except orchestrate server and orchestrate chat, target that environment. This includes importing, listing, and removing agents, tools, and connections.
+​
+Environment commands
+​
+Adding an environment
+Use the orchestrate env add command to add a remote environment to your local CLI. To learn where to find your service instance url and api key see Getting credentials for your environments.
+BASH
+orchestrate env add -n <environment-name> -u <your-instance-url>  
+Note:
+You can set any name you prefer for the environment.
+When you use a HIPAA‑regulated cluster, you must include the --iam-url parameter.
+Example:
+BASH
+orchestrate env add -n <onprem-environment-name> --iam-url https://api.us-east-1-reg.watson-orchestrate.ibm.com -u <watsonxorchestrateinstance>
+For on-premises environments, you can ignore invalid SSL certificates, if your environment uses a self-signed certificate:
+BASH
+orchestrate env add -n <onprem-environment-name> -u <your-instance-url> --insecure
+Show command flags
+
+​
+Activating an environment
+Use the orchestrate env activate command to authenticate against a given environment and target all commands other than orchestrate server and orchestrate chat to that environment.
+Note: Authentication against a remote environment expires every two hours. After expiration, you need to run orchestrate env activate again. This behavior does not exist in the local environment.
+To interactively activate an environment:
+BASH
+orchestrate env activate <environment-name>
+Please enter WXO API key: 
+To non-interactively log in for scripting, use the following:
+BASH
+orchestrate env activate <environment-name> --api-key <your-api-key>
+For on-premises environments:
+BASH
+orchestrate env activate <onprem-environment-name> --username=<username> --password=<password>
+You can also use an api-key in the on-premises environment:
+BASH
+orchestrate env activate <onprem-environment-name> --username=<username> --api-key=<api-key>
+Show command flags
+
+​
+Listing all environments
+Use the orchestrate env list command to list all environments currently available to your CLI.
+By default, you have one known as local. Your local environment refers to the watsonx Orchestrate Development Edition server. Others can be added by using the orchestrate env add command. The currently active environment will be indicated by an indicator saying (active) at the end of the line.
+BASH
+orchestrate env list
+​
+Removing an environment
+Use the orchestrate env remove command to remove an environment from your environment list.
+BASH
+orchestrate env remove -n <environment-name>
+​
+Important configuration files
+The watsonx Orchestrate CLI maintains two configuration files which are manipulated by the above env commands.
+The first is ~/.config/orchestrate/config.yaml. This configuration file records each of your environments as well as which environment is currently active.
+The second is ~/.cache/orchestrate/credentials.yaml. This file contains the JWT token from your last env activation used to authenticate with your environment.
+Examples
+Previous
+
+
+
+Getting credentials for your environments
+To change your environments in the ADK, you must provide the ADK with your service instance URL and your watsonx Orchestrate API key. Currently, watsonx Orchestrate as a service (SaaS) is deployed in both IBM Cloud and AWS. Depending on which environment you have a valid account, the process to retrieve this information can vary.
+​
+IBM Cloud
+To connect to IBM Cloud, you need both the service instance URL and an API key of your watsonx Orchestrate instance.
+Don’t use the credentials that you get from the IBM Cloud resources page. Use the following procedure to get the appropriate API key and service instance URL.
+1
+Log in to your watsonx Orchestrate instance.
+2
+Click your user icon on the top right and click Settings.
+
+3
+Go to the API details tab.
+4
+Copy the service instance URL.
+5
+Click the Generate API key button.
+
+6
+Generate an API Key
+
+The page redirects you to the IBM Cloud Identity Access Management center. Click Create to create a new API Key.
+
+7
+Enter a name and a description for your API Key.
+
+8
+Copy the API key and store it in a safe vault.
+
+9
+Add and activate your environment with the ADK CLI:
+BASH
+orchestrate env add <environment-name> -u <service-instance-url> --type ibm_iam --activate
+Note:
+You can set any name you prefer for the environment.
+For more information, see Configuring your environments.
+​
+AWS
+To connect to an instance hosted on AWS, follow these steps:
+1
+Log in to your watsonx Orchestrate instance.
+2
+Click your user icon on the top right and click Settings.
+
+3
+Go to the API details tab.
+4
+Copy the service instance URL.
+5
+Click the Generate API key button and copy the key.
+
+API keys are not retrievable and can’t be edited or deleted. Make sure to store your API keys in a safe location after you generate a new API key.
+You are limited to 10 API keys in this environment. If you have no more available keys, contact IBM Support for further assistance.
+6
+Add and activate your environment with the ADK CLI:
+BASH
+orchestrate env add -n <environment-name> -u <service-instance-url> --type mcsp --activate
+Note:
+You can set any name you prefer for the environment.
+For more information, see Configuring your environments.
+​
+On-premises
+For on-premises environments, you can authenticate using one of two methods:
+API Key
+Use the API key that authenticates your user in the on-premises watsonx Orchestrate environment.
+Username and Password
+Use your username and password credentials to authenticate in the on-premises watsonx Orchestrate environment.
+Operating in an air-gapped environment
+Using the ADK in an air-gapped environment introduces additional challenges that you need to address:
+The ADK Python package is hosted on PyPI, which is inaccessible in an air-gapped environment.
+By default, watsonx Orchestrate pulls packages from PyPI when installing Python tools.
+​
+Prerequisites
+As a site administrator, you need:
+Access to a jumpbox that connects to both the internet and your Cloud Pak for Data cluster
+A locally hosted Python package registry accessible from your internal network (common PyPI registry providers include Artifactory and Sonatype Nexus)
+​
+Uploading the ADK to your local PyPI registry
+1
+Get the dependencies list
+
+On your jumpbox, run the following commands to get the full list of dependencies and generate wheel files for each ADK dependency:
+# Install UV
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create a UV Virtual environment
+uv venv adk --seed --python=3.12
+source adk/bin/activate
+
+pip install ibm-watsonx-orchestrate==<supported_version>
+pip freeze > requirements.txt
+mkdir dependencies
+cd dependencies
+pip wheel -r ../requirements.txt
+2
+Upload wheel files
+
+Upload all generated wheel files from the dependencies directory to your local PyPI registry provider.
+​
+Configuring Python tool imports
+To import Python tools successfully, configure watsonx Orchestrate to pull the ADK from your local registry.
+All Python tools must be imported with a requirements.txt file that contains at least the following:
+--extra-index-url https://my-pypi-registry
+ibm-watsonx-orchestrate==<supported_version>
+# Optional: Add other dependencies
+my-dependency==dependency-version
+Any dependencies other than the ADK that you want to use in your tools must also be uploaded to your PyPI registry by the site administrator.
+​
+Related resources
+For version compatibility information, see the On-premises compatibility
+For general environment setup, see Initiate environment
+IBM Software Hub compatibility
+This page provides version compatibility information for the watsonx Orchestrate ADK when deployed on IBM Software Hub (on-premises).
+​
+Overview
+When deploying watsonx Orchestrate on IBM Software Hub, it’s essential to use the correct ADK version that corresponds to your IBM Software Hub version. This ensures optimal performance and compatibility.
+For air-gapped environment setup instructions, see Operating in an air-gapped environment.
+​
+Compatibility matrix
+The following table shows the supported ADK versions for each IBM Software Hub release:
+Release Date	IBM Software Hub Version	ADK Version	Standard Environment	Air-Gapped Environment	
+30 June, 2025	5.2.0	1.6.2	Supported	Not supported	
+30 July, 2025	5.2.0.1	1.6.x	Supported	Not supported	
+27 August, 2025	5.2.1	1.8.x	Supported	Contact IBM support for a patch	
+29 October, 2025	5.2.2	1.12.x	Supported	Supported	
+10 December, 2025	5.3.0	1.14.x	Supported	Supported	
+25 February, 2026	5.3.1	2.3.x	Supported	Supported	
+​
+Version selection guidelines
+When selecting an ADK version:
+Match your IBM Software Hub version: Always use the ADK version that corresponds to your IBM Software Hub deployment
+Check air-gapped support: If operating in an air-gapped environment, verify that your IBM Software Hub version supports it
+Apply patches: For patch releases, use the specified ADK version to ensure compatibility with bug fixes and improvements
+Using an incompatible ADK version may result in unexpected behavior or functionality issues. Always verify version compatibility before deployment.
+​
+Installing the ADK
+To install a specific ADK version:
+pip install ibm-watsonx-orchestrate==<version>
+Replace <version> with the appropriate version from the compatibility matrix (e.g., 2.13.0).
+​
+Related resources
+Operating in an air-gapped environment
+Initiate environment
+Installing the ADK

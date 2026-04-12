@@ -9,7 +9,7 @@ export const app = {
   shortName: "Command Center",
   pageTitle: "Pivt — Delivery Command Center",
   metaDescription:
-    "Track shipments, preview route choices, and keep customers updated — all in one calm dashboard.",
+    "Track shipments, compare route options in Response flow, and keep customers updated — all in one calm dashboard.",
 } as const;
 
 /** Time-of-day greeting for the signed-in experience (client-safe). */
@@ -43,11 +43,14 @@ export const sidebar = {
   assistHint: "Smart helpers stay ready in the background",
   estLateFee: "Est. late fee if delayed",
   featuredLoad: "Featured load",
-  /** Map footer / KPI strip — matches sidebar selection */
+  /** Route tab footer / KPI strip — matches sidebar selection */
   focusedLoad: "Load in focus",
   profileSection: "Your organization",
   editProfile: "Edit profile",
   profileLoading: "Loading profile…",
+  /** Title for the blinking dot when an NWS alert intersects that load’s corridor (cached snapshot). */
+  attentionBlinkTitle:
+    "Attention: active weather alert intersects this load’s corridor",
 } as const;
 
 export const profileModal = {
@@ -71,24 +74,56 @@ export const profileModal = {
 
 export const main = {
   headline: "Delivery Command Center",
-  welcomeLine: () => `${getTimeGreeting()} — glad you’re here.`,
+  welcomeLine: () => `${getTimeGreeting()}, glad you’re here.`,
   subline: greeting.tagline,
-  tabMap: "Map",
+  tabMap: "Route",
+  tabUpdatedRoute: "Route updates",
   tabWeather: "Weather events",
   tabWeatherSubtitle: "US NWS alerts vs routes",
-  tabRoutes: "Route choices",
   tabComms: "Driver updates",
-  tabCommsSubtitle: "Calls, dispatch & messages",
   tabLog: "Activity feed",
   tabFlow: "Response flow",
   flowTitle: "How the team responds to an alert",
   flowIntro:
-    "The pipeline order is fixed: Routing Pivt → Facility Pivt → Optimizing Pivt → Cost Pivt → Driver Pivt. The board row and the activity feed both follow the load selected in the left panel.",
+    "The pipeline order on the board is: Optimizing Pivt → Facility Pivt → Driver Pivt. Run Routing Pivt from the Weather events tab (NWS vs corridors) or via API. The board and activity feed follow the load selected in the left panel.",
   flowBoardTitle: "Agent workload by shipment",
+  flowBoardPathColumn: "Path status",
+  /** When the modeled corridor intersects an active NWS alert (same as Weather events tab). */
+  flowBoardPathWeatherIntersect: "Active weather alert on corridor",
+  flowBoardPathAttentionNeeded: "Attention needed",
+  /** Red pill in Path status when NWS intersection applies */
+  flowBoardAttentionChip: "Attention needed",
   flowBoardHint:
-    "Columns are agents; each row is a shipment. Hover a column header for a summary, or click for full details. Use Run agent on any cell to execute that Pivt against that load. Only agents with active work show a status in the drag area; drag a filled cell onto another to swap.",
+    "Path status uses the same NWS corridor intersection as Weather events: if a load’s route hits an active alert, it shows an attention state. Otherwise it reflects scenario path plus each load’s operational status. Then: shipment id and lane; agent columns are Optimizing, Facility, and Driver. Hover a column header for a summary, or click for full details. Use Run agent on any cell to execute that Pivt against that load.",
   flowCellRun: "Run agent",
   flowCellRunning: "Running…",
+  flowAgentStatusTitle: "Agent run in progress",
+  flowAgentStatusTitleDone: "Last agent run",
+  flowAgentStatusLoad: (id: string) => `Load ${id}`,
+  flowAgentStatusFooter:
+    "Calling Watsonx Orchestrate — the cell below will show the result when finished.",
+  flowAgentStatusDismissHint:
+    "Use the floating panel — Next steps opens a summary. Dismiss (×) clears it.",
+  flowNegotiatorPickInModal:
+    "Pick a route in Next steps (this panel) — your choice is saved to the load record and shown on the Route updates tab.",
+  flowModalRouteSection: "Commit route to load",
+  flowModalConfirmRoute: "Save selection",
+  flowModalOptOut: "Opt out",
+  flowModalRouteBusy: "Saving…",
+  flowModalRouteError: "Could not update load. Try again.",
+  flowModalSaved: (opt: string) =>
+    `✓ Route ${opt} saved — see the Route updates tab for the map.`,
+  flowModalOptedOut: "✓ Opted out — Facility Pivt is running for this load.",
+  workspaceToastRouteSaved: (opt: string) =>
+    `Route ${opt} saved. Switched to Route updates — the map shows that path.`,
+  workspaceToastRouteOptOut:
+    "Opted out of committing a route. Facility Pivt is starting for this load.",
+  flowModalFacilitySection: "Apply delivery stop order",
+  flowModalApplyFacilityOrder: "Apply selected order",
+  flowModalFacilityBusy: "Updating load…",
+  flowModalFacilityError: "Could not update delivery stops.",
+  workspaceToastFacilityOrderSaved:
+    "Delivery stop order saved — committed route cleared so the map follows the new stop sequence.",
   weatherTitle: "US weather alerts vs your corridors",
   weatherDesc:
     "The map plots every alert returned by api.weather.gov. Below, only loads whose corridors are disrupted by an alert are listed.",
@@ -122,6 +157,36 @@ export const main = {
     "United States (Albers): pulsing dots are every active NWS alert. Colored lines are disrupted loads — full driving paths from Google Directions (overview polyline) when a Maps API key is set; otherwise a simplified fallback line.",
   mapCaption:
     "Driving directions for the load selected in the left panel (Google Maps). The featured NY→Chicago lane uses a Columbus hub in weather scenarios, or Philadelphia for port scenarios.",
+  updatedRouteTitle: "Route updates",
+  updatedRouteSelectLoadHint:
+    "Select a load in the left panel to see route updates for that shipment.",
+  updatedRouteDesc:
+    "History of delivery stop order and committed Optimizing route changes for the selected load. Revert restores a prior snapshot. Map follows the live load record.",
+  updatedRouteEmpty:
+    "No committed route letter on this load yet. Run Optimizing Pivt → Next steps to save a letter, or use Facility Pivt to reorder stops — changes appear in the table above.",
+  routeRevisionsSectionTitle: "Route change history",
+  routeRevisionsLoading: "Loading route history…",
+  routeRevisionsEmpty:
+    "No route updates recorded yet. Saving a route option, opting out, or editing stops on this load will create entries here.",
+  routeRevisionsLoadError: "Could not load route history.",
+  routeRevisionsRevertError: "Could not restore that snapshot.",
+  routeRevisionsRevert: "Revert",
+  routeRevisionsReverting: "Restoring…",
+  routeRevisionsCurrentBadge: "Current",
+  routeRevisionsYes: "Yes",
+  routeRevisionsNo: "No",
+  routeRevisionsColWhen: "When",
+  routeRevisionsColSummary: "Update",
+  routeRevisionsColStops: "Stop order",
+  routeRevisionsColRoute: "Committed",
+  routeRevisionsColOptOut: "Opt out",
+  routeRevisionsColAction: "Action",
+  updatedRouteCaption:
+    "When a letter option is saved, the line matches that Google Directions profile. Opt out skips committing a map leg and hands off to Facility Pivt.",
+  routeCommitted: (opt: string) =>
+    `Route ${opt} committed — this load will follow the selected route.`,
+  routeOptedOut:
+    "Route commit skipped — Facility Pivt will determine next steps for this load.",
   routesRiskPrefix: "Risk check — ",
   driverCrmTitle: "Driver & shipment CRM",
   driverCrmHint:
@@ -240,7 +305,6 @@ export const agentLabels: Record<
   watchman: { short: "Routing", category: "Pivt" },
   node_manager: { short: "Facility", category: "Pivt" },
   negotiator: { short: "Optimizing", category: "Pivt" },
-  cfo: { short: "Cost", category: "Pivt" },
   diplomat: { short: "Driver", category: "Pivt" },
   system: { short: "Ingest", category: "Telemetry" },
 };

@@ -1,0 +1,191 @@
+Generating the JWT Token for AWS
+Last Updated
+: 2026-03-27
+Standard
+
+The AWS offering uses a JSON Web Token(JWT) to authenticate you in the watsonx Orchestrate API. To get this token, you have to make a request to the API by passing your API key.
+
+Before you begin
+You must have an API Key to generate your JWT Token. To learn how to generate an API key, see Generating an API Key for AWS.
+
+Generating the Token
+After generating the API key, to get the JSON Web Token(JWT), make a request to the authentication endpoint and pass the generated API key.
+
+The following URL is the authentication endpoint:
+
+https://iam.platform.saas.ibm.com/siusermgr/api/1.0/apikeys/token
+
+To call the authentication endpoint, you can use the following example code blocks:
+
+curl
+
+curl -X POST "https://iam.platform.saas.ibm.com/siusermgr/api/1.0/apikeys/token" \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json" \
+     -d '{
+           "apikey": "MY_API_KEY"
+         }'
+
+Python
+
+import http.client
+
+conn = http.client.HTTPSConnection("iam.platform.saas.ibm.com")
+
+payload = """
+{
+    "apikey": "MY_API_KEY"
+}
+"""
+
+headers = {
+    'content-type': "application/json",
+    'accept': "application/json"
+}
+
+conn.request("POST", "/siusermgr/api/1.0/apikeys/token", payload, headers)
+
+res = conn.getresponse()
+data = res.read()
+
+print(data.decode("utf-8"))
+
+const url = "https://iam.platform.saas.ibm.com/siusermgr/api/1.0/apikeys/token";
+
+const payload = {
+  apikey: "MY_API_KEY"
+};
+
+fetch(url, {
+  method: "POST",
+  headers: {
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+  },
+  body: JSON.stringify(payload)
+})
+  .then(response => response.json())
+  .then(data => console.log(data))
+  .catch(error => console.error("Error:", error));
+
+
+  Getting started with the API
+Get started with the watsonx Orchestrate API.
+
+Authenticating to the API
+To use the watsonx Orchestrate API, you must first authenticate to the server. Each watsonx Orchestrate offering uses a different method to authenticate to the server.
+
+1. Generating an API key
+For all the offerings, the first step is to generate an API key:
+
+IBM Cloud
+AWS
+AWS GovCloud
+On-premises
+2. Generating the authentication token
+After you get your API key, use it to generate an authentication token.
+
+IBM Cloud
+IBM Cloud uses the IAM Access Token to authenticate to watsonx Orchestrate. You must generate it using the API key.
+
+AWS and AWS GovCloud
+The AWS offering uses a JSON Web Token(JWT) to authenticate you in the watsonx Orchestrate API. You must generate it using the API key.
+
+On-premises
+The on-premises offering uses the Zen API key that you have obtained in the previous step. You don't need to obtain another token.
+
+Calling the server's endpoints
+After you get the authentication tokens, you can use them to call the API endpoints.
+
+To get the API endpoints, see Getting the API endpoints.
+
+These are a few examples of how to call the API endpoints with the proper authorization tokens:
+
+IBM Cloud
+curl
+
+curl -X GET "https://api.REGION_CODE.watson.cloud.ibm.com/instances/MY_INSTANCE_ID/v1/orchestrate/digital-employees/allskills" \
+     -H "Authorization: Bearer MY_IAM_TOKEN" \
+     -H "Accept: application/json"
+Python
+
+import http.client
+
+region_code = "REGION_CODE"
+iam_token = "MY_IAM_TOKEN"
+instance_id = "MY_INSTANCE_ID"
+
+conn = http.client.HTTPSConnection(f"api.{region_code}.watson-orchestrate.ibm.com")
+
+headers = {
+    'Authorization': f"Bearer {iam_token}",\
+    'accept': "application/json"
+}
+
+conn.request("GET", f"/instances/{instance_id}/v1/orchestrate/digital-employees/allskills", headers=headers)
+
+res = conn.getresponse()
+data = res.read()
+
+print(data.decode("utf-8"))
+AWS
+curl
+
+curl -X GET "https://api.REGION_CODE.watson-orchestrate.ibm.com/instances/MY_INSTANCE_ID/v1/orchestrate/digital-employees/allskills" \
+     -H "Authorization: Bearer MY_JWT_TOKEN" \
+     -H "Accept: application/json"
+Python
+
+import http.client
+
+region_code = "REGION_CODE"
+jwt_token = "MY_JWT_TOKEN"
+instance_id = "MY_INSTANCE_ID"
+
+conn = http.client.HTTPSConnection(f"{region_code}.dl.watson-orchestrate.ibm.com")
+
+headers = {
+    'Authorization': f"Bearer {jwt_token}",\
+    'accept': "application/json"
+}
+
+conn.request("GET", f"/instances/{instance_id}/v1/orchestrate/digital-employees/allskills", headers=headers)
+
+res = conn.getresponse()
+data = res.read()
+
+print(data.decode("utf-8"))
+On-premises
+curl
+
+curl -X GET "https://MYHOST:PORT//orchestrate/MY_NAMESPACE/instances/MY_INSTANCE_ID/v1/orchestrate/digital-employees/allskills" \
+     -H "Authorization: ZenApiKey MY_ZEN_API_KEY" \
+     -H "Accept: application/json"
+Python
+
+import http.client
+import base64
+
+
+region_code = f"https://MYHOST:PORT/"
+api_key = "MY_API_KEY"
+username = "MY_USER_NAME"
+api_key_bytes = f"{username}:{api_key}".encode(encoding="utf-8")
+zen_api_key = base64.encodebytes(api_key_bytes).decode(encoding="utf-8")
+namespace = "MY_NAMESPACE"
+instance_id = "MY_INSTANCE_ID"
+endpoint = "/orchestrate/{namespace}/instances/{instanceid}/v1/orchestrate/digital-employees/allskills/"
+
+conn = http.client.HTTPSConnection(f"{myhost}")
+
+headers = {
+    'Authorization': f"ZenApiKey {zen_api_key}",\
+    'accept': "application/json"
+}
+
+conn.request("GET", endpoint, headers=headers)
+
+res = conn.getresponse()
+data = res.read()
+
+print(data.decode("utf-8"))

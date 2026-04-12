@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import type { RouteWeatherHit, UsMapDisplay } from "@/lib/weather-route-intersection";
 import { main } from "@/lib/ui-copy";
@@ -26,7 +26,35 @@ function severityBadgeClass(severity: string): string {
   return "bg-white/10 text-[var(--muted)]";
 }
 
-export function WeatherEventsPanel() {
+type WeatherEventsPanelProps = {
+  /** Fires after a successful fetch so parents can reload ``/api/weather-snapshot`` from SQLite. */
+  onLoaded?: () => void;
+  /** Same order as Loads sidebar: weather attention first, then id (from ``/api/ships``). */
+  fleetSortOrder?: string[];
+};
+
+function sortHitsByFleetOrder(
+  hits: RouteWeatherHit[],
+  fleetSortOrder: string[] | undefined,
+): RouteWeatherHit[] {
+  if (!fleetSortOrder?.length) {
+    return [...hits].sort((a, b) => a.shipmentId.localeCompare(b.shipmentId));
+  }
+  const rank = new Map(fleetSortOrder.map((id, i) => [id, i]));
+  return [...hits].sort((a, b) => {
+    const ra = rank.get(a.shipmentId);
+    const rb = rank.get(b.shipmentId);
+    if (ra !== undefined && rb !== undefined) return ra - rb;
+    if (ra !== undefined) return -1;
+    if (rb !== undefined) return 1;
+    return a.shipmentId.localeCompare(b.shipmentId);
+  });
+}
+
+export function WeatherEventsPanel({
+  onLoaded,
+  fleetSortOrder,
+}: WeatherEventsPanelProps) {
   const [data, setData] = useState<ApiPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,17 +71,23 @@ export function WeatherEventsPanel() {
         return;
       }
       setData(json);
+      onLoaded?.();
     } catch {
       setError(main.weatherError);
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [onLoaded]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  const hitsSorted = useMemo(() => {
+    if (!data?.hits?.length) return [];
+    return sortHitsByFleetOrder(data.hits, fleetSortOrder);
+  }, [data, fleetSortOrder]);
 
   if (loading && !data) {
     return (
@@ -140,7 +174,7 @@ export function WeatherEventsPanel() {
       ) : null}
 
       <div className="space-y-4">
-        {data.hits.map((row) => (
+        {hitsSorted.map((row) => (
           <div
             key={row.shipmentId}
             className="border border-[var(--border)] bg-[var(--surface)]"

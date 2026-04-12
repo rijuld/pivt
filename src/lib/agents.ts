@@ -5,7 +5,6 @@ export type AgentKey =
   | "watchman"
   | "node_manager"
   | "negotiator"
-  | "cfo"
   | "diplomat";
 
 export type StatusVariant = "danger" | "warning" | "success" | "neutral" | "info";
@@ -21,6 +20,15 @@ export interface RosterAgent {
 }
 
 export const ROSTER_AGENTS: RosterAgent[] = [
+  {
+    key: "negotiator",
+    initials: "OP",
+    name: "Optimizing Pivt",
+    role: "Route options & financial guardrail",
+    detail:
+      "Optimizing Pivt is the routing engine: it calls the external routing API and builds three alternative route options (fastest, cheapest, balanced). It then applies financial guardrails — comparing each option’s premium to the contract SLA penalty for late delivery and rejecting routes that cost more than absorbing the fine, with a VIP override when applicable — before recommendations move downstream.",
+    accent: "from-sky-500/25 to-blue-600/15",
+  },
   {
     key: "watchman",
     initials: "RP",
@@ -40,24 +48,6 @@ export const ROSTER_AGENTS: RosterAgent[] = [
     accent: "from-amber-500/25 to-orange-600/15",
   },
   {
-    key: "negotiator",
-    initials: "OP",
-    name: "Optimizing Pivt",
-    role: "Route options engine",
-    detail:
-      "Optimizing Pivt is the routing engine. It calls the external routing API and generates exactly three alternative route options for every exception: the fastest possible path, the cheapest possible path, and a balanced option that sits between the two. Each route is returned as an array of ETA delta and cost, giving the next agent clean data to evaluate.",
-    accent: "from-sky-500/25 to-blue-600/15",
-  },
-  {
-    key: "cfo",
-    initials: "CP",
-    name: "Cost Pivt",
-    role: "Financial guardrail",
-    detail:
-      "Cost Pivt is the financial guardrail. It takes the route array from Optimizing Pivt and compares each option's cost against the contract SLA penalty for late delivery. Any route whose premium exceeds the penalty gets rejected — because it would cost more to fix the problem than to absorb the fine. The one exception is shipments flagged as VIP, which trigger an unconditional override that approves any route regardless of cost.",
-    accent: "from-emerald-500/25 to-teal-600/15",
-  },
-  {
     key: "diplomat",
     initials: "DP",
     name: "Driver Pivt",
@@ -67,6 +57,11 @@ export const ROSTER_AGENTS: RosterAgent[] = [
     accent: "from-rose-500/25 to-pink-600/15",
   },
 ];
+
+/** Response flow CRM board columns — Routing Pivt is not on this board (run via Weather tab or API). */
+export const FLOW_BOARD_AGENTS: RosterAgent[] = ROSTER_AGENTS.filter(
+  (a) => a.key !== "watchman",
+);
 
 export function rosterStatus(
   key: AgentKey,
@@ -96,10 +91,6 @@ export function rosterStatus(
       if (phase === "thinking" || phase === "resolved")
         return { label: "3 options", variant: "success" };
       if (phase === "threat") return { label: "Waiting", variant: "warning" };
-      return { label: "Ready", variant: "neutral" };
-    case "cfo":
-      if (phase === "resolved") return { label: "Approved", variant: "success" };
-      if (phase === "thinking") return { label: "Reviewing", variant: "warning" };
       return { label: "Ready", variant: "neutral" };
     case "diplomat":
       if (phase === "resolved") return { label: "Sent", variant: "success" };
@@ -137,7 +128,6 @@ const ROSTER_KEY_TO_ORCHESTRATE_ID: Record<
   watchman: "routing_pivt",
   node_manager: "facility_pivt",
   negotiator: "optimizing_pivt",
-  cfo: "cost_pivt",
   diplomat: "driver_pivt",
 };
 

@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:agents": "node --env-file=.env.local ./node_modules/.bin/tsx scripts/test-agents.ts",
+    "test:agents:detail": "node --env-file=.env.local ./node_modules/.bin/tsx scripts/test-agents-detailed.ts",
     "generate:world-path": "node scripts/generate-world-land-path.mjs"
   },
   "dependencies": {
@@ -16,12 +18,14 @@
     "better-sqlite3": "^12.8.0",
     "d3-geo": "^3.1.1",
     "framer-motion": "^12.38.0",
+    "ioredis": "^5.10.1",
     "mapbox-gl": "^3.21.0",
     "next": "16.2.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "react-map-gl": "^8.1.1",
     "topojson-client": "^3.1.0",
+    "us-atlas": "^3.0.1",
     "world-atlas": "^2.0.2"
   },
   "devDependencies": {
@@ -39,6 +43,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

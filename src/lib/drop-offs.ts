@@ -89,6 +89,42 @@ export function syncDestFromDropOffsJson<T extends DropOffShipmentFields>(ship: 
   };
 }
 
+/**
+ * True when the shipment has 2+ ordered delivery stops (i.e. multi-destination).
+ */
+export function isMultiStop(ship: DropOffShipmentFields): boolean {
+  return orderedDeliveryStops(ship).length >= 2;
+}
+
+/**
+ * Return the next (first) delivery stop from the current origin.
+ * Multi-stop loads: Optimizing Pivt only needs origin → next stop.
+ */
+export function nextDeliveryStop(
+  ship: DropOffShipmentFields,
+): DropOffStop {
+  const stops = orderedDeliveryStops(ship);
+  return stops[0]!;
+}
+
+/**
+ * Build a "next-leg only" virtual shipment for Optimizing Pivt: origin → first
+ * stop, with no intermediate waypoints.  Remaining stops are preserved in
+ * ``dropOffsJson`` for informational purposes but are not on the driving path.
+ */
+export function nextLegShipment<T extends DropOffShipmentFields>(ship: T): T {
+  const stops = orderedDeliveryStops(ship);
+  if (stops.length <= 1) return ship;
+  const next = stops[0]!;
+  return {
+    ...ship,
+    destLat: next.lat,
+    destLng: next.lng,
+    destLabel: next.label,
+    dropOffsJson: null,
+  };
+}
+
 /** Centroid of origin + every delivery stop (better than O–D only for multi-stop lanes). */
 export function shipRouteMidpointWithDrops(
   ship: DropOffShipmentFields,

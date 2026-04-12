@@ -136,6 +136,8 @@ function defaultsForCreate(): ActiveShipment {
     routeVariantsJson: null,
     crmTimelineJson: null,
     dropOffsJson: null,
+    optimizingSelectedRoute: null,
+    optimizingRouteOptOut: false,
   };
 }
 
@@ -546,19 +548,6 @@ export function ShipEditorModal({
                     ))}
                   </select>
                 </Field>
-                <label className="flex cursor-pointer items-center gap-2 border border-[var(--border)] bg-[var(--surface-card)] px-3 py-2.5">
-                  <input
-                    type="checkbox"
-                    checked={form.isPrimary}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, isPrimary: e.target.checked }))
-                    }
-                    className="border border-[var(--border)] text-[var(--accent)] focus:ring-[var(--accent)]/40"
-                  />
-                  <span className="text-[12px] text-[var(--foreground)]">
-                    {shipModal.primaryVip}
-                  </span>
-                </label>
 
                 <p className="pt-1 text-[10px] font-semibold uppercase tracking-[0.15em] text-[var(--muted)]">
                   {shipModal.optionalHeading}

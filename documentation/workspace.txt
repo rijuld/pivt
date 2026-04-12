@@ -1,0 +1,83 @@
+Workspace operations
+Workspaces provide a way to organize and manage resources within an IBM Cloud environment. A workspace represents an isolated context where resources such as agents, tools, and toolkits can be created, managed, and accessed. Each environment includes a global workspace by default, and more workspaces can be created to segment resources and control access. All workspace operations are available through the orchestrate workspaces command group.
+Workspaces are supported only for IBM Cloud environments.
+​
+Creating or updating a workspace
+The orchestrate workspaces create command creates a new workspace or updates an existing one. If a workspace with the specified name exists, the command updates its description.
+BASH
+orchestrate workspaces create \
+--name workspace_name \
+--description "Workspace description"
+Show command flags
+
+​
+Listing workspaces
+The orchestrate workspaces list command lists all available workspaces and indicates which workspace is active.
+BASH
+orchestrate workspaces list
+Show command flags
+
+​
+Removing a workspace
+The orchestrate workspaces remove command deletes a workspace. Artifact handling behavior is controlled through command flags.
+BASH
+orchestrate workspaces remove \
+--name workspace_name \
+--delete-artifacts
+Show command flags
+
+​
+Activating a workspace
+The orchestrate workspaces activate command sets a workspace as the active context. All subsequent operations are run within this workspace.
+BASH
+orchestrate workspaces activate workspace_name
+Show command flags
+
+​
+Deactivating a workspace
+The orchestrate workspaces deactivate command resets the active context to the global workspace.
+BASH
+orchestrate workspaces deactivate
+​
+Exporting a workspace
+The orchestrate workspaces export command exports all resources from a workspace into a ZIP file.
+BASH
+orchestrate workspaces export \
+--name workspace_name \
+--output workspace_export.zip
+Show command flags
+
+​
+Managing workspace members
+Workspace membership is managed by using the orchestrate workspaces members command group. These commands allow adding, listing, and removing users within a workspace. If no workspace name is provided, the active workspace is used.
+​
+Adding or updating a member
+The orchestrate workspaces members add command adds a user to a workspace or updates their role.
+BASH
+orchestrate workspaces members add \
+--user user@example.com \
+--role owner \
+--name workspace_name
+Show command flags
+
+​
+Listing workspace members
+The orchestrate workspaces members list command lists all members in a workspace.
+BASH
+orchestrate workspaces members list \
+--name workspace_name
+Show command flags
+
+​
+Removing a member
+The orchestrate workspaces members remove command removes a user from a workspace.
+BASH
+orchestrate workspaces members remove \
+--user user@example.com \
+--name workspace_name
+Show command flags
+
+​
+Workspace context
+When a workspace is active, all resource operations are scoped to that workspace. Commands such as create, list, update, and delete operate within the active workspace context. If no workspace is explicitly specified in a command, the active workspace is used automatically.
+To copy agents from another workspace, see Copy agents between workspaces.

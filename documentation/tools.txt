@@ -1,0 +1,1650 @@
+Overview
+Tools are essential components of agents, enabling them to perform actions such as querying data, creating documents, or executing transactions on behalf of users. Some tools might require a connection to work properly.
+The watsonx Orchestrate ADK includes a set of built-in tools you can use in agents. These tools are versatile and apply to many scenarios.
+You can also create custom tools with ADK when needed. Custom tools can come from:
+OpenAPI Use OpenAPI tools to quickly consume remote web services that include an OpenAPI specification file on watsonx Orchestrate. For more information, see Authoring OpenAPI based tools.
+Python Python tools give you flexibility and power to extend agent functionality in watsonx Orchestrate, especially when combined with agentic workflows. For more information, see Authoring Python-Based Tools.
+Agentic workflows An agentic workflow acts as a tool with built-in agentic capabilities and automations. It supports complex orchestration of multiple agents, tools, and people. For more information, see Authoring agentic workflow tools.
+Langflow Langflow lets you visually design, test, and deploy AI applications with a drag-and-drop interface. You can build tools in Langflow and then import them into watsonx Orchestrate. For more information, see Authoring Langflow tools.
+ADK also lets you manage tools in your active environment. You can list, export, update, and delete tools. For more information, see Managing tools.
+Enabling watsonx/* LLMs
+Previous
+
+Authoring OpenAPI based tools
+OpenAPI tools provide a quick way to consume remote web services that include an OpenAPI specification file.
+For watsonx Orchestrate to use an OpenAPI tool, the following conditions must be met:
+Endpoints must accept and return JSON.
+The specification must include a servers block with exactly one URL. This URL cannot contain parameterization.
+Each path that exposes an endpoint must include an operationId. This value becomes the tool name. For best results, use snake_case for operationId values.
+Each path that exposes an endpoint must include a description. The agent uses this description to decide when to use the tool and what the tool does.
+The OpenAPI version must be 3.0.
+Here is an example of a minimal OpenAPI specification:
+YAML
+servers:
+- url: mytoolserver
+paths:
+/:
+   get:
+      operationId: my_tool
+      description: The description of the tool that clearly explains its purpose to an LLM
+      requestBody:
+         ...
+      responses:
+         ...
+​
+Importing OpenAPI based tools
+To import an OpenAPI tool, run:
+BASH
+orchestrate tools import -k openapi -f <file-path> -a <app-id>
+Show command flags
+
+​
+Additional features of OpenAPI tools
+Securely providing credentials
+
+Asynchronous tools with callbacks
+
+​
+Limitations and considerations
+Using OpenAPI tools with your agents is straightforward, but default OpenAPI specifications often perform poorly as agent tools for the following reasons. If any of these issues apply to your use case, consider adjusting your OpenAPI specification or using Python tools instead.
+OpenAPI endpoints are designed for developers, not agents.
+Developers can rely on context from other endpoints and external documentation to understand an endpoint’s purpose. Agents cannot. All necessary context must be included within the endpoint itself.
+OpenAPI endpoints often include large sets of input arguments. In contrast, tools should have focused inputs and outputs that resolve a single task. For more information, see Designing agents and tools for best performance .
+Agents require a highly descriptive semantic layer.
+OpenAPI tools do not support x-ibm- extensions used in older watsonx Orchestrate Skills.
+Authoring Python-Based Tools
+Python tools are one of the most flexible and powerful ways to extend agent functionality in watsonx Orchestrate, especially when combined with agentic workflows.
+A Python tool consists of one or more Python files. Within these files, you define one or more functions and annotate them with the @tool decorator to expose them to Orchestrate.
+Each Python tool runs inside an isolated container with its own virtual environment. This ensures that the tool and its dependencies remain sandboxed from the host operating system, providing a secure and consistent runtime.
+Python tool example
+Python
+#test_tool.py
+from ibm_watsonx_orchestrate.agent_builder.tools import tool
+
+
+@tool()
+def my_tool(input: str) -> str:
+    """Executes the tool's action based on the provided input.
+
+    Args:
+        input (str): The tool's input.
+
+    Returns:
+        str: The tool's output.
+    """
+
+    #functionality of the tool
+
+    return f"Hello, {input}"
+Show detailed @tool parameter descriptions
+
+Note:
+Python tools must use Google-style docstrings to apply descriptions and document the tool.
+​
+Auto-discover
+The ADK can convert ordinary Python files into Python tools that are ready to be uploaded to Orchestrate. The process automatically imports and adds a @tool decorator and generates a docstring for functions in the source file.
+For docstring generation, an LLM is invoked, so the command requires an environment (.env) file with valid credentials for Groq, watsonx, or Orchestrate. To convert a Python file, use the following command:
+BASH
+orchestrate tools auto-discover --file path\to\python\file --output path\to\output\file --env-file .env --llm groq/openai/gpt-oss-120b --function name_of_function1 --function name_of_function2
+The command takes the following arguments:
+Show Arguments
+
+The auto-discover feature is standalone but also bundled with the import process.
+This option takes all the flags of the standalone auto-discover command except --output.
+The ADK runs the auto-discover process and uploads the results instead of writing to a file.
+If you are using AI Gateway, the model name must start with virtual-model or virtual-policy and you must pass it with the —llm flag.
+​
+Importing Python-based tools
+To import a Python tool use the orchestrate tools import command using the -f flag to specify which python file contains your tool definitions. Each @tool annotated in the given file will be exposed as a tool within your active watsonx Orchestrate environment.
+It is recommended to include only a single @tool annotated function per file so that tools can be imported independently.
+BASH
+orchestrate tools import -k python -f my-tool.py -r requirements.txt -a app1 -a app2
+Show command flags
+
+​
+Additional features of Python tools
+Adding Dependencies
+
+Using complex input and output argument types with Pydantic
+
+Securely providing credentials
+
+Creating multi-file Python tool packages
+
+Creating tools that accept files
+
+Creating tools that return inline tables, images or links
+
+Using Context Variables
+
+Dynamic input and output schemas
+
+Creating tools that can trigger citations
+
+Use the same ADK version when importing tools to ensure compatibility.
+Reuse a common requirements.txt across multiple tools to reduce repeated virtual-environment setup.
+If tools require conflicting package versions, maintain separate requirements.txt files and environments.
+​
+Runtime and migration strategy
+Python tools execute within a UV virtual environment inside a component called the tools runtime. This runtime includes a predefined set of supported Python versions. Currently, the only supported version is Python 3.12.
+​
+Version Management
+When a tool is imported into the runtime, it uses the Python version it was originally imported with.
+If that version becomes deprecated by watsonx Orchestrate, the system will:
+Display a deprecation warning in the UI.
+Show the same warning when running the command:
+BASH
+orchestrate tools list
+Inform the user that the tool must be reimported to remain compatible.
+​
+Deprecation Timeline
+After 24 months of deprecation:
+The runtime will remove support for the deprecated Python version.
+If the tool has not been reimported, the runtime will attempt to reimport it using the closest supported Python version.
+​
+Limitations of Python tools
+​
+Host networking
+watsonx Orchestrate Developer Edition: Python tools run inside a container. In this environment, localhost refers to the container itself, not the host machine. To call an endpoint on the host machine, use docker.host.internal or the host machine’s IP address.
+SaaS: The SaaS version of watsonx Orchestrate cannot access your company’s internal network. If internal access is required, prototype with the Developer Edition and then deploy watsonx Orchestrate on-premises or consult IBM for alternative solutions.
+On-premises: To allow a tool to access external internet resources, ensure that firewall rules do not block outbound traffic from the node pool responsible for tool execution.
+​
+Read only filesystem
+For security and stability, tools execute in a read-only filesystem. Each tool can access only its own filesystem and cannot modify files during execution.
+Understanding agentic workflows
+Agentic workflow is a type of tool with built-in agentic capabilities and automations that support arbitrarily complex orchestration of multiple agents, tools, and people.
+Each node can represent an agent, a tool, or built-in capabilities such as user interactions, prompts, or decision logic.
+With agentic workflows, you design workflows using control structures such as conditional branching with if-then-else or switch-case, iteration over lists with foreach, and loops that repeat actions until specific conditions are met.
+An agentic workflow is composed of nodes and edges. You define nodes of different types and connect them using edges. Because agentic workflows can take several seconds to execute depending on their complexity, they run asynchronously.
+Agentic workflows apply to various scenarios, such as:
+Repeatable, predictable sequencing of agents, tools, and human tasks is required.
+Long-running processes are involved. Agentic workflow supports extended task chains that can take minutes, hours, or even days to complete.
+Human-in-the-loop interaction is needed for approvals or decision-making.
+Scheduling is necessary to trigger tasks at specific times or intervals.
+When an agentic workflow tool is invoked, the system returns an instance ID and waits for the response.
+To check the progress, use the Get agentic workflow status tool in a new chat session. Provide the instance ID to retrieve the current status of the agentic workflow.
+Tools built using Agentic workflows do not require connection support as connections within Agentic workflows are configured via their downstream component tools.
+​
+Agentic workflow and ADK
+Unlike the UI experience, the pro-code approach uses the ADK CLI and Python library. You build agentic workflows with the Python library included in ADK, then manage them with the ADK CLI in your active environment. This environment can be local or remote. For details, see Environments.
+1
+Create an agentic workflow
+
+Use Python and the ADK library to create agentic workflows and their nodes. For more information, see:
+Building agentic workflows
+Agentic workflow nodes
+Testing agentic workflow
+2
+Import the workflow into your environment
+
+After creating a workflow, import it into your active watsonx Orchestrate environment using the command orchestrate tools import with the flag --kind flow. For more information, see Import the agentic workflow.
+3
+Manage agentic workflows in your environment
+
+After you import an agentic workflow, you can also list it, export it, update it, and remove it from your active environment. Because an agentic workflow is a type of tool, you manage it with the same commands you use for other tools in ADK. For more information, see Managing tools.
+​
+Agentic workflow key concepts
+The sections below introduce the key concepts and components you’ll use when working with agentic workflows:
+Edges
+
+Node types
+
+Node specification
+
+Data mapping
+
+Scheduling
+
+​
+Agentic workflow examples
+The examples/flow_builder directory includes sample agentic workflow that demonstrate key agentic workflow features:
+agent_scheduler: Demonstrates agent scheduling.
+collaborator_agents: Shows how to sequence multiple agents.
+extract_support_request: Uses an LLM to extract information from support requests.
+foreach_email: Applies the Foreach control to iterate over a set of items.
+get_facts_numbers: Uses the Loop control to repeat work until a condition is met.
+get_insurance_rate: Uses a Decisions node to determine insurance rates based on credit rating and loan amount.
+get_pet_facts: Demonstrates branching to route requests.
+get_tuition_reimbursed: Uses multiple branches to support complex logic routing.
+hello_message_flow: Sequences two Python tools together.
+ibm_knowledge_to_emails: Combines an agent and a tool in a single agentic workflow.
+schedule_helpdesk_alert: Creates a schedulable agentic workflow to check helpdesk availability.
+text_extract: Uses the DocProc node to extract text from a document.
+user_flow_application_form: Displays a form to the user in the chat.
+Building agentic workflows
+An agentic workflow is a collection of nodes and edges that define the logic of your workflow. To build an agentic workflow, follow these steps:
+1
+Import your agents and tools
+
+Ensure that the agents and tools you want to connect in an agentic workflow are already imported.
+2
+Define a Python function with the @flow decorator
+
+Use the @flow decorator to define your agentic workflow. In the decorator, specify the agentic workflow’s name, display_name, description, input_schema, output_schema, initiators, schedulable, llm_model, and agent_conversation_memory_turns_limit.
+The function must take a single parameter of type Flow and return a Flow object.
+Construct the agentic workflow using a combination of tool(), agent(), and edge-building functions like sequence() or edge().
+For Branch and Loop nodes, use a Python expression in the evaluator to define the branching or looping condition. For more information, see Agentic workflow expressions.
+The following tabs show some code snippet examples of agentic workflow:
+Example 1
+Example 2
+Example 3
+Example 4
+Example 1: Sequencing two tools
+Python
+@flow(
+    name = "hello_message_flow",
+    input_schema=Name,
+    output_schema=str
+)
+def build_hello_message_flow(aflow: Flow = None) -> Flow:
+    """ Based on the first and last name of a person, combine into a single name and create a simple hello world message. """
+
+    combine_names_node = aflow.tool(combine_names)
+    get_hello_message_node = aflow.tool(get_hello_message)
+
+    aflow.edge(START, combine_names_node).edge(combine_names_node, get_hello_message_node).edge(get_hello_message_node, END)
+
+    return aflow
+See all 14 lines
+For the full example and complete code, see hello_message_flow.
+3
+Import the agentic workflow
+
+Import the agentic workflow as a tool using the orchestrate tools import command in the CLI.
+BASH
+orchestrate tools import -k flow -f <file-path>
+Show command flags
+
+4
+Test the agentic workflow locally in the ADK
+
+Test the agentic workflow you created using a Python script before adding it to an agent. For more information, see Testing flows.
+5
+Add the agentic workflow to one agent
+
+After successfully testing the agentic workflow, add it to an agent’s specification and update the agent.
+
+Agent node
+Use an agent node to call an agent in your agentic workflow.
+To configure an agent node, call the agent() method in your agentic workflow. In this method, define the following parameters:
+​
+name
+stringrequired
+The name of the agent.
+​
+agent
+stringrequired
+The agent used in the agentic workflow.
+​
+display_name
+string
+The display name of the agent.
+​
+title
+string
+The title of the agent.
+​
+message
+string
+The message of the agent. If not configured, the default message is “Follow the agent instructions”.
+​
+description
+string
+The description of the agent.
+​
+input_schema
+type[BaseModel]
+Input schema for the tool.
+​
+output_schema
+type[BaseModel]
+Output schema for the tool.
+​
+guidelines
+string
+The guidelines of the agent.
+​
+input_map
+DataMap
+Define input mappings using a structured collection of Assignment objects.
+The following example shows how to configure an agent node in an agentic workflow:
+Python
+'''
+Build a simple flow that will sequence call an agent and a tool.
+'''
+
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import Flow, flow
+from ibm_watsonx_orchestrate.flow_builder.flows.constants import END, START
+from .send_emails import send_emails
+
+class FlowInput(BaseModel):
+    question: str = Field(description="A topic to search for about IBM")
+    emails: str = Field(description="a list of comman separated email address")
+
+class FlowOutput(BaseModel):
+    question: str = Field(description="A topic to search for about IBM")
+    answer: str = Field(description="A fact about IBM")
+    emails: str = Field(description="The email addresse the we sent. comma separated.")
+
+class IBMAgentInput(BaseModel):
+    question: str = Field(description="A topic to search for")
+
+class IBMAgentOutput(BaseModel):
+    answer: str = Field(description="A fact about IBM")
+
+class EmailAgentInput(BaseModel):
+    emails: str = Field(description="Comma separated list of email addresses")
+    question: str = Field(description="A topic to search for about IBM")
+    answer: str = Field(description="The email content")
+
+class EmailAgentOutput(BaseModel):
+    message: str = Field(description="The message we sent.")
+
+@flow(
+    name="ibm_knowledge_to_emails",
+    description="This flow will send a random fact about IBM to a group of people",
+    input_schema=FlowInput,
+    output_schema=FlowOutput
+)
+def build_ibm_knowledge_to_emails(aflow: Flow) -> Flow:
+    """ Retrieve a random fact about IBM and send it out to an email list. """
+
+    # when talking to an agent, we need to be very precise on what we want to get done.
+    # or there is a chance the agent will not be able to response correctly.
+    # In the message, you should refer to information that the Flow engine will send 
+    # to the agent.
+    ask_agent_for_ibm_knowledge = aflow.agent(
+        name="ask_agent_for_ibm_knowledge",
+        agent="ibm_agent",
+        description="Ask the IBM agent to get a fact based on the provided question.",
+        message="Give an answer about IBM based on the provided question.  If you don't know the answer, just say 'I do not know'",
+        input_schema=IBMAgentInput,
+        output_schema=IBMAgentOutput,
+    )
+
+    send_emails_node = aflow.tool(send_emails)
+   
+    aflow.sequence(START, ask_agent_for_ibm_knowledge, send_emails_node, END)
+
+    return aflow
+See all 59 lines
+
+Tool node
+Use a tool node to call a tool in your agentic workflow.
+To configure a tool node, use the tool() method in your agentic workflow. In this method, define the following parameters:
+​
+tool
+Any or stringrequired
+The tool used in the agentic workflow. Configure it as a string such as "myTool" or as a Python function such as myTool.
+Note:
+Only functions that use the @tool decorator qualify for the Python function option.
+​
+name
+string
+The name of the tool.
+​
+display_name
+string
+The display name of the tool.
+​
+description
+string
+The description of the tool.
+​
+input_schema
+type[BaseModel]
+Input schema for the tool.
+​
+output_schema
+type[BaseModel]
+Output schema for the tool.
+​
+input_map
+DataMap
+Define input mappings using a structured collection of Assignment objects.
+​
+error_handler_config
+NodeErrorHandlerConfi
+Defines the configuration for the retry option using a JSON structure. In this JSON, set the following fields:
+error_message: an optional string that describes the retry error.
+max_retries: an optional integer that limits how many times the node retries.
+retry_interval: an optional integer that sets the interval between retries in milliseconds.
+The following example shows how to configure a tool node in an agentic workflow:
+Python
+'''
+Build a simple flow that will sequence call an agent and a tool.
+'''
+
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import Flow, flow
+from ibm_watsonx_orchestrate.flow_builder.flows.constants import END, START
+from .send_emails import send_emails
+
+class FlowInput(BaseModel):
+    question: str = Field(description="A topic to search for about IBM")
+    emails: str = Field(description="a list of comman separated email address")
+
+class FlowOutput(BaseModel):
+    question: str = Field(description="A topic to search for about IBM")
+    answer: str = Field(description="A fact about IBM")
+    emails: str = Field(description="The email addresse the we sent. comma separated.")
+
+class IBMAgentInput(BaseModel):
+    question: str = Field(description="A topic to search for")
+
+class IBMAgentOutput(BaseModel):
+    answer: str = Field(description="A fact about IBM")
+
+class EmailAgentInput(BaseModel):
+    emails: str = Field(description="Comma separated list of email addresses")
+    question: str = Field(description="A topic to search for about IBM")
+    answer: str = Field(description="The email content")
+
+class EmailAgentOutput(BaseModel):
+    message: str = Field(description="The message we sent.")
+
+@flow(
+    name="ibm_knowledge_to_emails",
+    description="This flow will send a random fact about IBM to a group of people",
+    input_schema=FlowInput,
+    output_schema=FlowOutput
+)
+def build_ibm_knowledge_to_emails(aflow: Flow) -> Flow:
+    """ Retrieve a random fact about IBM and send it out to an email list. """
+
+    # when talking to an agent, we need to be very precise on what we want to get done.
+    # or there is a chance the agent will not be able to response correctly.
+    # In the message, you should refer to information that the Flow engine will send 
+    # to the agent.
+    ask_agent_for_ibm_knowledge = aflow.agent(
+        name="ask_agent_for_ibm_knowledge",
+        agent="ibm_agent",
+        description="Ask the IBM agent to get a fact based on the provided question.",
+        message="Give an answer about IBM based on the provided question.  If you don't know the answer, just say 'I do not know'",
+        input_schema=IBMAgentInput,
+        output_schema=IBMAgentOutput,
+    )
+
+    send_emails_node = aflow.tool(send_emails)
+   
+    aflow.sequence(START, ask_agent_for_ibm_knowledge, send_emails_node, END)
+
+    return aflow
+See all 59 lines
+Branch node
+Use a branch node to create different branches in your agentic workflow.
+To configure a branch node, call the branch() method and define an evaluator or expression that determines which path to follow.
+The example below demonstrates how to configure a branch node.
+Python
+from pydantic import BaseModel, Field
+
+from ibm_watsonx_orchestrate.flow_builder.flows import (
+    Flow, flow, START, END, Branch
+)
+
+class Pet(BaseModel):
+    kind: str = Field(description="the kind of pet: dog or cat")
+
+class PetFacts(BaseModel):
+    facts: list[str] = Field(description="A list of facts about the pet")
+
+@flow(
+        name = "get_pet_facts",
+        input_schema = Pet,
+        output_schema = PetFacts
+)
+def build_get_pet_facts_flow(aflow: Flow) -> Flow:
+    """ Based on the request, we will return the list of facts about the pet. A pet can be either a cat or a dog. """
+    
+    dog_fact_node = aflow.tool("getDogFact")
+    cat_fact_node = aflow.tool("getCatFact")
+
+    # create a branch
+    check_pet_kind_branch: Branch = aflow.branch(evaluator="flow.input.kind.strip().lower() == 'dog'")
+    aflow.edge(START, check_pet_kind_branch)
+
+    # edges are automatically added when cases are added
+    check_pet_kind_branch.case(True, dog_fact_node).case(False, cat_fact_node)
+
+    aflow.edge(dog_fact_node, END)
+    aflow.edge(cat_fact_node, END)
+
+    return aflow
+See all 34 lines
+Foreach node
+Use a foreach node to create a sub agentic workflow that repeats nodes for each item in the input schema.
+To configure a foreach node in an agentic workflow, call the foreach() method to define a nested agentic workflow. In this method, define the following parameters:
+​
+item_schema
+BaseModelrequired
+The schema that defines each item to iterate over.
+​
+input_schema
+BaseModel
+The input schema for the nested agentic workflow executed by the foreach node.
+​
+output_schema
+BaseModel
+The output schema for the nested agentic workflow executed by the foreach node.
+Example
+foreach_flow: Flow = aflow.foreach(item_schema = CustomerRecord, output_schema=Invitations)
+Next, call the foreach agentic workflow for the node you want to repeat. You can include more than one node in the same foreach flow.
+Example
+node2 = foreach_flow.tool(send_invitation_email)
+foreach_flow.sequence(START, node2, END)
+The example below shows how to configure a foreach node:
+Python
+"""
+In this example, the user is retrieving a set of email addresses from a contact list, and 
+for each email address, sending out an invitation.
+"""
+
+from typing import List
+
+from pydantic import BaseModel, Field
+
+from ibm_watsonx_orchestrate.agent_builder.tools import tool, ToolPermission
+from ibm_watsonx_orchestrate.flow_builder.flows import Flow, flow, START, END
+
+from .send_invitation_email import send_invitation_email
+from .get_emails_from_customer import get_emails_from_customer, CustomerRecord
+
+
+class CustomerName(BaseModel):
+    name: str = Field(description="The name of the customer")
+
+class Invitations(BaseModel):
+    invitations: List[str]
+
+@flow(
+    name="send_invitation_to_customer",
+    input_schema=CustomerName,
+    output_schema=None
+)
+def build_send_invitation_to_customer_flow(aflow: Flow) -> Flow:
+    """ Given a list of customers, we will iterate through the list and send email to each """
+    
+    get_customer_list_node = aflow.tool(get_emails_from_customer)
+
+    # calling add_foreach will create a subflow, and we can add more node to the subflow
+    foreach_flow: Flow = aflow.foreach(item_schema = CustomerRecord, output_schema=Invitations)
+    
+    node2 = foreach_flow.tool(send_invitation_email)
+    foreach_flow.sequence(START, node2, END)
+
+    # add the foreach flow to the main flow
+    aflow.edge(START, get_customer_list_node)
+    aflow.edge(get_customer_list_node, foreach_flow)
+    aflow.edge(foreach_flow, END)
+
+    return aflow
+
+See all 45 lines
+​
+Foreach processing method
+You can configure how your foreach node processes input items. There are two processing methods:
+Sequential
+A sequential foreach processes items one after another. The next item starts only after the previous one finishes. Use this method when the order of item processing affects the result.
+Parallel
+A parallel foreach processes one or more items at the same time. In most cases, this method runs faster than the sequential approach.
+To set the processing method, call the policy() method in your foreach node. This method accepts the following parameter:
+​
+kind
+ForeachPolicyrequired
+Defines the processing method. Use ForeachPolicy.SEQUENTIAL for sequential processing or ForeachPolicy.PARALLEL for parallel processing.
+Python
+"""
+In this example, the user is retrieving a set of email addresses from a contact list, and 
+for each email address, sending out an invitation.
+"""
+
+from typing import List
+
+from pydantic import BaseModel, Field
+
+from ibm_watsonx_orchestrate.agent_builder.tools import tool, ToolPermission
+from ibm_watsonx_orchestrate.flow_builder.flows import Flow, flow, START, END
+from ibm_watsonx_orchestrate.flow_builder.types import ForeachPolicy
+
+from .send_invitation_email import send_invitation_email
+from .get_emails_from_customer import get_emails_from_customer, CustomerRecord
+
+
+class CustomerName(BaseModel):
+    name: str = Field(description="The name of the customer")
+
+class Invitations(BaseModel):
+    invitations: List[str]
+
+@flow(
+    name="send_invitation_to_customer",
+    input_schema=CustomerName,
+    output_schema=None
+)
+def build_send_invitation_to_customer_flow(aflow: Flow) -> Flow:
+    """ Given a list of customers, we will iterate through the list and send email to each """
+    
+    get_customer_list_node = aflow.tool(get_emails_from_customer)
+
+    # calling add_foreach will create a subflow, and we can add more node to the subflow
+    foreach_flow: Flow = aflow.foreach(item_schema = CustomerRecord, output_schema=Invitations) \
+        .policy(kind=ForeachPolicy.SEQUENTIAL)
+        # .policy(kind=ForeachPolicy.PARALLEL) # replace with 'ForeachPolicy.PARALLEL' if need to run .foreach in parallel
+    
+    node2 = foreach_flow.tool(send_invitation_email)
+    foreach_flow.sequence(START, node2, END)
+
+    # add the foreach flow to the main flow
+    aflow.edge(START, get_customer_list_node)
+    aflow.edge(get_customer_list_node, foreach_flow)
+    aflow.edge(foreach_flow, END)
+
+    return aflow
+See all 47 lines
+Decisions node (Public Preview)
+A decisions node is designed to manage and execute decision table, which is composed of a set of rules. Each rules will be evaluated in order from top to bottom and the result of the first successful rule will be returned as the final result.
+​
+Rule
+Each rule includes two parts:
+conditions: A set of conditions to evaluate.
+actions: The results to return when all conditions are satisfied.
+​
+Condition
+Each condition includes a key and a value expression. To simplify condition building and ensure correct syntax, use the DecisionsCondition class.
+Show supported types
+
+Show supported expressions
+
+The following example checks whether the value of revenue_quote_ratio falls within the range from 0 (inclusive) to 50 (exclusive).
+Python
+"conditions": {
+  "revenue_quote_ratio": "[0:50)"
+}
+​
+Action
+An action defines the result when all conditions in a rule are satisfied. You can also define a default action to return when no rules match.
+​
+Locale
+You can specify a locale string (e.g., en-US, fr-FR, es-MX) to control how dates are parsed. Currently, locale only affects date parsing.
+​
+Example
+In this example (get_insurance_rate), you define a set of rules to calculate the insurance rate based on credit grade and loan amount:
+Python
+def build_decisions(aflow: Flow) -> DecisionsNode:
+    """
+    Build a Decisions Table programmatically as a node.
+    e.g. read from an Excel spreadsheet or CSV and populate the decision table.
+    """
+    rules = []
+    ## We will be build the rules programmatically.
+    rule1 = DecisionsRule()
+    rule1.condition("grade", DecisionsCondition().equal("A")).condition("loan_amount", DecisionsCondition().less_than(100000))
+    rule1.action("insurance_required", False)
+    rules.append(rule1)
+    rule2 = DecisionsRule()
+    rule2.condition("grade", DecisionsCondition().equal("A")).condition("loan_amount", DecisionsCondition().in_range(100000, 300000, True, False))
+    rule2.action("insurance_required", True).action("insurance_rate", 0.001)
+    rules.append(rule2)
+    rule3 = DecisionsRule()
+    rule3.condition("grade", DecisionsCondition().equal("A")).condition("loan_amount", DecisionsCondition().in_range(300000, 600000, True, False))
+    rule3.action("insurance_required", True).action("insurance_rate", 0.003)
+    rules.append(rule3)
+    rule4 = DecisionsRule()
+    rule4.condition("grade", DecisionsCondition().equal("A")).condition("loan_amount", DecisionsCondition().greater_than_or_equal(600000))
+    rule4.action("insurance_required", True).action("insurance_rate", 0.005)
+    rules.append(rule4)
+    ## We will be build the rules programmatically.
+    rule5 = DecisionsRule()
+    rule5.condition("grade", DecisionsCondition().equal("B")).condition("loan_amount", DecisionsCondition().less_than(100000))
+    rule5.action("insurance_required", False)
+    rules.append(rule5)
+    rule6 = DecisionsRule()
+    rule6.condition("grade", DecisionsCondition().equal("B")).condition("loan_amount", DecisionsCondition().in_range(100000, 300000, True, False))
+    rule6.action("insurance_required", True).action("insurance_rate", 0.0025)
+    rules.append(rule6)
+    rule7 = DecisionsRule()
+    rule7.condition("grade", DecisionsCondition().equal("B")).condition("loan_amount", DecisionsCondition().in_range(300000, 600000, True, False))
+    rule7.action("insurance_required", True).action("insurance_rate", 0.005)
+    rules.append(rule7)
+    rule8 = DecisionsRule()
+    rule8.condition("grade", DecisionsCondition().equal("A")).condition("loan_amount", DecisionsCondition().greater_than_or_equal(600000))
+    rule8.action("insurance_required", True).action("insurance_rate", 0.0075)
+    rules.append(rule8)
+    node = aflow.decisions(
+        name="assess_insurance_rate",
+        display_name="Assess insurance rate.",
+        description="Based on credit rate and loan amount, assess insurance rate.",
+        rules=rules,
+        default_actions={
+            "assessment_error": "Not assessed. Incorrect data submitted."
+        },
+        input_schema=AssessmentData,
+        output_schema=Assessment
+    )
+    return node
+See all 52 lines
+Generative prompt node
+Use a generative prompt node to generate AI-driven content using large language models (LLMs). To configure a generative prompt node in your agentic workflow, call the prompt() method. In this method, define the following parameters:
+​
+name
+stringrequired
+Unique identifier for the node.
+​
+display_name
+string
+Display name for the node.
+​
+system_prompt
+string or list[string]
+Initial instructions that guide the LLM’s behavior.
+It also supports expressions. For example: flow.input.variable_1.
+​
+user_prompt
+string or list[string]
+The specific request or task you want the LLM to perform.
+It also supports expressions. For example: flow.input.variable_1.
+​
+prompt_examples
+list[PromptExample]
+Examples of user prompts. You can configure:
+input: The example input prompt.
+expected_output: The expected output for the given input.
+enabled: A boolean value to enable or disable the example.
+​
+llm
+string
+LLM used for content generation.
+​
+llm_parameters
+PromptLLMParameters
+Parameters for the LLM. You can configure:
+temperature: Controls randomness. Higher values produce more diverse outputs.
+min_new_tokens: Sets the minimum number of tokens to generate.
+max_new_tokens: Sets the maximum number of tokens to generate.
+top_k: Limits token selection to the top k most likely options.
+top_p: Uses nucleus sampling to select from the top p cumulative probability.
+stop_sequences: Defines sequences that stop generation when encountered.
+​
+description
+string
+Description of the node.
+​
+input_schema
+type[BaseModel]
+Input schema for the LLM.
+​
+output_schema
+type[BaseModel]
+Output schema for the LLM.
+​
+input_map
+DataMap
+Define input mappings using a structured collection of Assignment objects.
+​
+error_handler_config
+NodeErrorHandlerConfi
+Defines the configuration for the retry option using a JSON structure. In this JSON, set the following fields:
+error_message: an optional string that describes the retry error.
+max_retries: an optional integer that limits how many times the node retries.
+retry_interval: an optional integer that sets the interval between retries in milliseconds.
+The following example shows how to configure a generative prompt node in a Python function and instantiate it in an agentic workflow:
+Python
+'''
+Build a simple hello world agentic workflow that will combine the result of two tools.
+'''
+
+from datetime import datetime
+from typing import Optional
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import END, Flow, flow, START, PromptNode
+
+from .email_helpdesk import email_helpdesk
+
+class Message(BaseModel):
+    """
+    This class represents the content of a support request message.
+
+    Attributes:
+        message (str): support request message
+    """
+    message: str
+    requester_name: Optional[str] = Field(default=None, description="Name of the support requestor.")
+    requester_email: Optional[str] = Field(default=None, description="Email address of the support requestor.")
+    received_on: Optional[str|datetime] = Field(default=None, description="The date when the support message was received.")
+
+class SupportInformation(BaseModel):
+    requester_name: str | None = Field(description="Name of the support requestor.")
+    requester_email: str | None = Field(description="Email address of the support requestor.")
+    summary: str = Field(description="A high level summary of the support issue.")
+    details: str = Field(description="Original text of the support request.")
+    order_number: str | None = Field(description="The order number.")
+    received_on: datetime | None = Field(description="The date when the support message was received.")
+
+def build_prompt_node(aflow: Flow) -> PromptNode:
+    prompt_node = aflow.prompt(
+        name="extract_support_info",
+        display_name="Extract information from a support request message.",
+        description="Extract information from a support request message.",
+        system_prompt=[
+            "You are a customer support processing assistant, your job take the supplied support request received from email,",
+            "and extract the information in the output as specified in the schema."
+        ],
+        user_prompt=[
+            "Here is the {message}"
+        ],
+        llm="meta-llama/llama-3-3-70b-instruct",
+        llm_parameters={    
+            "temperature": 0,
+            "min_new_tokens": 5,
+            "max_new_tokens": 400,
+            "top_k": 1,
+            "stop_sequences": ["Human:", "AI:"]
+        },
+        error_handler_config={
+            "error_message": "An error has occurred while invoking the LLM",
+            "max_retries": 1,
+            "retry_interval": 1000
+        },
+        input_schema=Message,
+        output_schema=SupportInformation
+    )
+    return prompt_node
+
+@flow(
+        name = "extract_support_info",
+        input_schema=Message,
+        output_schema=SupportInformation
+    )
+def build_extract_support_info(aflow: Flow = None) -> Flow:
+    """
+    Creates an agentic workflow that will use the Prompt node to extract information from a support
+    message, and forward the summary to the helpdesk.
+    This agentic workflow will rely on the agentic workflow engine to perform automatic data mapping at runtime.
+
+    Args:
+        flow (Flow, optional): During deployment of the agentic workflow model, it will be passed an agentic workflow instance.
+
+    Returns:
+        Flow: The created agentic workflow.
+    """
+    email_helpdesk_node = aflow.tool(email_helpdesk)
+    prompt_node = build_prompt_node(aflow)
+
+    aflow.sequence(START, prompt_node, email_helpdesk_node, END)
+
+    return aflow
+See all 84 lines
+User activity node
+Use a user activity node to define interactive steps in your agentic workflow where users provide or receive information in one of two ways:
+In a multi-turn conversation, where the user provides or receives one piece of data at a time
+Through a form, which prompts the user for several pieces of data in a single conversational turn
+To add a user activity node to your agentic workflow, start by creating a userflow() object.
+​
+Multi-turn conversations user activity
+To collect or deliver one piece of data at a time, call field() on the userflow() object. This method accepts the following input parameters:
+​
+name
+stringrequired
+Unique identifier for the node.
+​
+kind
+UserFieldKindrequired
+Type of user activity. Supported types: Text, Date, DateTime, Time, Number, File, Boolean, Object, Choice.
+​
+display_name
+string
+Display name for the node.
+​
+description
+string
+Description of the node.
+​
+direction
+stringrequired
+Indicates whether the node is for input or output.
+​
+default
+any
+Default value for the node.
+​
+option
+UserFieldOption
+List of predefined options with their labels and values.
+​
+is_list
+bool
+Indicates whether the node accepts multiple values.
+​
+min
+any
+Minimum value or constraint.
+​
+max
+any
+Maximum value or constraint.
+​
+input_map
+DataMap
+Define input mappings using a structured collection of Assignment objects.
+​
+custom
+dictionary
+Dictionary for additional metadata or configuration.
+Here is an example that shows how to use field():
+Python
+from typing import List
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import (
+    Flow, flow, UserNode, START, END
+)
+from ibm_watsonx_orchestrate.flow_builder.types import Assignment, UserFieldKind
+from ibm_watsonx_orchestrate.flow_builder.data_map import DataMap
+
+class Name(BaseModel):
+    """
+    This class represents a person's name.
+
+    Attributes:
+        name (str): The person's first name.
+    """
+    first_name: str = Field(default="John Doe", description="First name")
+
+@flow(
+    name ="user_flow_example",
+    display_name="user_flow_example",
+    description="Example user flow.",
+    input_schema=Name,
+)
+def build_user_flow(aflow: Flow = None) -> Flow:
+    # user_flow which is a subflow to be added to the aflow
+    user_flow = aflow.userflow()
+
+    # add file upload
+    user_node1 = user_flow.field(direction="input",name="upload", display_name="File upload 1",  kind=UserFieldKind.File)
+
+    # add file download
+    data_map = DataMap()
+    data_map.add(Assignment(target_variable="self.input.value",value_expression="flow[\"userflow_1\"][\"File upload 1\"].output.value"))
+    user_node2 = user_flow.field(direction="output",name="download", display_name="Download file",  kind=UserFieldKind.File, input_map=data_map)
+
+    # add a Display user text field
+    user_node3 = user_flow.field(direction="output",name="display_first_name", display_name="Display first name", kind=UserFieldKind.Text, text="Display of first name is {flow.input.first_name}")
+
+    # add a text input field
+    user_node4 = user_flow.field(direction="input",name="last_name", display_name="Last name",  kind=UserFieldKind.Text)
+    
+    # add a Number input field
+    user_node5 = user_flow.field(direction="input",name="age", display_name="Age",  kind=UserFieldKind.Number)
+
+    # create a data map to build an array to be assigned to a user field of kind List
+    data_map = DataMap()
+    data_map.add(Assignment(target_variable="self.input.value",value_expression="[\"Alice\", \"Bob\", \"Charlie\", \"Diana\", \"Ethan\", \"Fiona\", \"George\"]"))
+    user_node6 = user_flow.field(direction="output",name="Friends", display_name="List of friends", kind=UserFieldKind.List, input_map=data_map)
+
+    # add a Choice input field
+    data_map_choices = DataMap()
+    data_map_choices.add(Assignment(target_variable="self.input.choices",value_expression='["dog", "cat", "bird", "fish"]'))
+    user_node7 = user_flow.field(direction="input",name="pet_choice",display_name="Select Your Pet",kind=UserFieldKind.Choice,text="Choose your favorite pet:",input_map=data_map_choices)
+    
+    # A user flow edges
+    user_flow.edge(START, user_node1)
+    user_flow.edge(user_node1, user_node2)
+    user_flow.edge(user_node2, user_node3)
+    user_flow.edge(user_node3, user_node4)
+    user_flow.edge(user_node4, user_node5)
+    user_flow.edge(user_node5, user_node6)
+    user_flow.edge(user_node6, END)
+    
+    # add the user flow to the flow sequence to create the flow edges
+    aflow.sequence(START, user_flow, END)
+
+    return aflow
+See all 67 lines
+​
+Forms user activity
+To prompt for multiple pieces of data in a single turn, instantiate the form() object to create a form node. This method accepts the following input parameters:
+​
+name
+stringrequired
+The internal name of the form.
+​
+display_name
+string
+The display name shown on the form.
+​
+instructions
+string
+Instructions text for the form.
+​
+submit_button_label
+string
+The label for the submit button. Defaults to Submit if not set.
+​
+cancel_button_label
+string
+The label for the cancel button. If set to None, hides the button.
+​
+Forms fields
+After instantiating the form object, add fields to it. Each field type requires its own configuration. Supported field types include:
+text_input_field
+
+boolean_input_field
+
+date_range_input_field
+
+date_input_field
+
+datetime_input_field
+
+datetime_range_input_field
+
+number_input_field
+
+file_upload_field
+
+message_output_field
+
+field_output_field
+
+list_output_field
+
+list_input_field
+
+file_download_field
+
+single_choice_input_field
+
+multi_choice_input_field
+
+user_input_field
+
+Here is an example that shows how to use form():
+Python
+from typing import List
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import (
+    Flow, flow, UserNode, START, END
+)
+from ibm_watsonx_orchestrate.flow_builder.types import Assignment, UserFieldKind
+from ibm_watsonx_orchestrate.flow_builder.data_map import DataMap
+
+class Name(BaseModel):
+    """
+    This datatype represents a person's name.
+
+    Attributes:
+        name (str): The person's first name.
+    """
+    first_name: str = Field(default="John", description="First name")
+    last_name: str = Field(default="Doe", description="Last name")
+
+class Book(BaseModel):
+    """
+    This datatype represents a book.
+
+    Attributes:
+        title (str): The book's title.
+        author (str): The book's author.
+    """
+    title: str = Field(default="Shaken", description="Book title")
+    author: str = Field(default="John Grisham", description="Author")
+
+class StringListNames(BaseModel):
+    listOfNames: List[Name] = Field(
+        default=[{"John", "Doe"}, {"Jane", "Doe"}, {"Jean", "Doe"}],
+        description="A list of Name objects with first and last names."
+    )
+
+class MyDate(BaseModel):
+    """
+    This datatype represents date information.
+
+    Attributes:
+        dateStart (str): The start date.
+        dateEnd (str): The end date.
+        dateEvent (str): The event date.
+    """
+    dateStart: str = Field(default="2023-01-01", description="Start date")
+    dateEnd: str = Field(default="2023-12-31", description="End date")
+    dateEvent: str = Field(default="2023-06-15", description="Event date")
+
+class FlowInput(BaseModel):
+    salutations: List[str] = Field(
+        default=["Mr", "Mrs"],
+        description="A list of string salutations."
+    )
+    listOfLanguages: List[str] = Field(
+        default=["java", "python", "typescript"],
+        description="A list of languages."
+    )
+    salary_expectation: int = Field(
+        default=200000,
+        description="Expected salary as an integer number."
+    )
+
+    friends: StringListNames = Field(
+        default=StringListNames(
+            listOfNames=[
+                Name(first_name="John", last_name="Doe"),
+                Name(first_name="Jane", last_name="Doe"),
+                Name(first_name="Jean", last_name="Doe")
+            ]
+        ),
+        description="A list of friends with their names."
+    )
+    books: List[Book] = Field(
+        default=[Book()],
+        description="A list of books."
+    )
+
+    event_date: MyDate = Field(
+        default=MyDate(),
+        description="The event date"
+    ),
+
+    listOfFruits: List[str] = Field(
+        default=["apple", "oranges", "bananas"],
+        description="A list of fruits."
+    )
+
+    listOfPreferredFruits: List[str] = Field(
+        default=["apple", "oranges"],
+        description="A list of preferred fruits."
+    )
+
+@flow(
+    name ="user_flow_application_form",
+    display_name="Application form",
+    description="Creates a sample application form.",
+    input_schema=FlowInput,
+)
+
+def build_user_form(aflow: Flow = None) -> Flow:
+
+    user_flow = aflow.userflow()
+    user_flow.spec.display_name= "Application"
+
+    # Create form with default submit button and visible cancel button
+    user_node_with_form = user_flow.form(
+        name="ApplicationForm",
+        display_name="Application",
+        cancel_button_label="Cancel"
+    )
+    
+    data_map = DataMap()
+    data_map.add(Assignment(target_variable="self.input.choices", value_expression="flow.input.salutations"))
+ 
+    #Single-choice: Salutation
+    user_node_with_form.single_choice_input_field(name="salutation", label="Salutation", required=True, choices=data_map, 
+                                                  show_as_dropdown=True, placeholder_text="Please enter your title")
+   
+    #Boolean: Married
+    user_node_with_form.boolean_input_field(name="married", label="Married", single_checkbox = True, true_label="Married", false_label="Not married")
+    
+    #Text: Last Name
+    user_node_with_form.text_input_field(name="lastName", label="Last name", required=True, placeholder_text="Enter your name here", help_text="Enter name", 
+        regex="^[a-zA-Z0-9\s]+$", regex_error_message="No special characters allowed")
+    
+    #Number: Age
+    user_node_with_form.number_input_field(name="age", label="Age", required=True, help_text="Enter your age")
+
+    data_map_salary = DataMap()
+    data_map_salary.add(Assignment(target_variable="self.input.default", value_expression="flow.input.salary_expectation"))
+    
+    #Number: Desired Salary
+    user_node_with_form.number_input_field(name="salary", label="Desired salary", is_integer=False, help_text="Your dream salary is here", default=data_map_salary)
+  
+    data_map_desired_salary = DataMap()
+    data_map_desired_salary.add(Assignment(target_variable="self.input.value", value_expression="flow.input.salary_expectation"))
+
+     #Field: Projected salary
+    user_node_with_form.field_output_field(name="acknowledge", label="Projected salary", value = data_map_desired_salary)
+
+    #FileUpload
+    data_map_min_files = DataMap()
+    data_map_min_files.add(Assignment(target_variable="self.input.min_num_files", value_expression="1"))
+
+    data_map_max_files = DataMap()
+    data_map_max_files.add(Assignment(target_variable="self.input.max_num_files", value_expression="2"))
+
+    user_node_with_form.file_upload_field(name="credentials", label="Upload credentials", allow_multiple_files=True, file_max_size=256,
+                                          min_num_files=data_map_min_files, max_num_files=data_map_max_files)
+
+    #Date: End Date
+    data_map_default_date = DataMap()
+    data_map_default_date.add(Assignment(target_variable="self.input.default",value_expression="flow.input.event_date.dateEnd"))
+
+    data_map_min_date = DataMap()
+    data_map_min_date.add(Assignment(target_variable="self.input.min_date",value_expression="\"2026-01-05\""))
+    
+    data_map_max_date = DataMap()
+    data_map_max_date.add(Assignment(target_variable="self.input.max_date",value_expression="\"2026-01-12\""))
+
+    user_node_with_form.date_input_field(name="endDate", label="End Date", required=True, default=data_map_default_date, 
+                                        min_date=data_map_min_date, max_date=data_map_max_date)
+  
+    data_map_list_source = DataMap()
+    data_map_list_source.add(Assignment(target_variable="self.input.choices", value_expression="flow.input.listOfLanguages"))
+    
+    #Output List: Qualification
+    user_node_with_form.list_output_field(name="strength", label="Qualification", choices=data_map_list_source)
+
+    #Output list: Friends table
+    data_map_list_friends = DataMap()
+    data_map_list_friends.add(Assignment(target_variable="self.input.choices", value_expression="flow.input.friends.listOfNames"))
+    user_node_with_form.list_output_field(name="friends", label="Friends", choices=data_map_list_friends, columns={"first_name": "First", "last_name": "Last"})
+
+    #Mult-chocice: List of fruits dowpdown primitives
+    data_map_multi_choice = DataMap()
+    data_map_multi_choice.add(Assignment(target_variable="self.input.choices", value_expression="flow.input.listOfFruits"))
+
+    data_map_multi_choice_default = DataMap()
+    data_map_multi_choice_default.add(Assignment(target_variable="self.input.default", value_expression="flow.input.listOfPreferredFruits"))
+
+    user_node_with_form.multi_choice_input_field(name="multi-choice", label="List of Fruits", required=False, choices=data_map_multi_choice, 
+                                                  show_as_dropdown=True, placeholder_text="Please enter your choice", default=data_map_multi_choice_default,
+                                                  minItems=1, maxItems=2)
+    
+    #Mult-chocice: Books dowpdown complex
+    data_map_list_books = DataMap()
+    data_map_list_books.add(Assignment(target_variable="self.input.choices", value_expression="flow.input.books"))
+    user_node_with_form.multi_choice_input_field(name="multi-choice_as_dropdown_1", label="List of Books", required=False, choices=data_map_list_books, 
+                                                  show_as_dropdown=True, dropdown_item_column="title", placeholder_text="Please enter your choice")
+ 
+    #Mult-chocice: List of names table
+    data_map_list_friends_choice2 = DataMap()
+    data_map_list_friends_choice2.add(Assignment(target_variable="self.input.choices", value_expression="flow.input.friends.listOfNames"))
+
+    user_node_with_form.multi_choice_input_field(name="multi-choice_as_table", label="List of Names", required=False, choices=data_map_list_friends_choice2, 
+                                                  show_as_dropdown=False, placeholder_text="Please enter your choice", columns={"first_name": "First", "last_name": "Last"} )
+
+    #Input list: Books editable table
+    data_map_list_books = DataMap()
+    data_map_list_books.add(Assignment(target_variable="self.input.default", value_expression="flow.input.books"))
+
+    user_node_with_form.list_input_field(name="books", label="Books", default=data_map_list_books, columns={"title": "Book Title", "author": "Book Author"})
+    #Input list: Fuits editable table
+    data_map_list_fruits = DataMap()
+    data_map_list_fruits.add(Assignment(target_variable="self.input.default", value_expression="flow.input.listOfFruits"))
+
+    user_node_with_form.list_input_field(name="Fruits", label="Preferred fruits", default=data_map_list_fruits)
+
+    # User field: Select multiple approvers (min 1, max 5)
+    data_map_min_users = DataMap()
+    data_map_min_users.add(Assignment(target_variable="self.input.min_num_users", value_expression="1"))
+    data_map_max_users = DataMap()
+    data_map_max_users.add(Assignment(target_variable="self.input.max_num_users", value_expression="5"))
+    user_node_with_form.user_input_field(name="approvers", label="Select Approvers", required=True, multiple_users=True,
+                                         min_num_users=data_map_min_users, max_num_users=data_map_max_users)
+
+    # User field: Select a single assignee (min/max not applicable for single user)
+    user_node_with_form.user_input_field(name="assignee", label="Select Assignee", required=True, multiple_users=False)
+    #Output Message: Successful submission
+    user_node_with_form.message_output_field(name="success", label="Successful submission", message="Application successfully completed.")
+ 
+    # Add additional buttons using the new API
+    save_draft_btn = user_flow.add_button("Save Draft")
+    review_btn = user_flow.add_button("Submit for Review")
+    
+    # Create different nodes for each button action
+    submit_node = user_flow.script(
+        name="process_submit",
+        script='print("Processing full submission...")'
+    )
+    
+    save_draft_node = user_flow.script(
+        name="process_save_draft",
+        script='print("Saving as draft...")'
+    )
+    
+    review_node = user_flow.script(
+        name="process_review",
+        script='print("Submitting for review...")'
+    )
+
+    # Connect nodes using the new edge API
+    user_flow.edge(START, user_node_with_form)
+    
+    # Connect default "Submit" button using button_label parameter
+    user_flow.edge(user_node_with_form, submit_node, button_label="Submit")
+    user_flow.edge(submit_node, END)
+    
+    # Connect "Save Draft" button using Button object
+    user_flow.edge(save_draft_btn, save_draft_node)
+    user_flow.edge(save_draft_node, END)
+    
+    # Connect "Submit for Review" button using Button object
+    user_flow.edge(review_btn, review_node)
+    user_flow.edge(review_node, END)
+
+    # Script to initialize friends list
+    init_script = """
+flow.input.friends.listOfNames = [
+    {"first_name": "John", "last_name": "Doe"},
+    {"first_name": "Alice", "last_name": "Smith"},
+    {"first_name": "Bob", "last_name": "Johnson"}
+]
+flow.input.books=[
+    { "title": "Shaken", "author":"John Grisham"},
+    {"title": "The Client", "author":"John Grisham"},
+]
+flow.input.listOfFruits = ["apple", "oranges", "bananas"]
+"""
+    init_data = aflow.script(name="init_data", script=init_script)
+    
+    # add the user flow to the flow sequence to create the flow edges
+    aflow.sequence(START, init_data, user_flow, END)
+  
+    return aflow
+See all 276 lines
+​
+Dynamic form input
+Form fields can change based on user actions. You define the dependencies between the user’s interactions and your tools to control dynamic behavior in the form. This includes progressive selection, showing or hiding widgets, and updating widget labels.
+Use the following methods to configure dynamic forms:
+visibility_behaviour_field
+
+label_behaviour_field
+
+value_source_behaviour_field
+
+Here is an example that shows how to configure dynamic forms:
+Python
+from typing import List
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import (
+    Flow, flow, UserNode, START, END
+)
+from ibm_watsonx_orchestrate.flow_builder.types import Assignment
+from ibm_watsonx_orchestrate.flow_builder.data_map import DataMap
+from ibm_watsonx_orchestrate.flow_builder.utils import RuleBuilder
+
+
+class FlowInput(BaseModel):
+    """Input schema for the flow."""
+    countries: List[str] = Field(
+        default=["USA", "Canada"],
+        description="A list of available countries."
+    )
+    usa_states: List[str] = Field(
+        default=["California", "Texas", "New York", "Florida"],
+        description="A list of US states."
+    )
+    canada_provinces: List[str] = Field(
+        default=["Ontario", "Quebec", "British Columbia", "Alberta"],
+        description="A list of Canadian provinces."
+    )
+    default_country: str = Field(
+        default="USA",
+        description="Default country selection."
+    )
+    default_region: str = Field(
+        default="California",
+        description="Default region selection."
+    )
+
+
+@flow(
+    name="user_activity_with_dynamic_forms_full",
+    display_name="Dynamic Form - A simple example",
+    description="Demonstrates dynamic form behaviours",
+    input_schema=FlowInput,
+)
+def build_dynamic_form_full(aflow: Flow = None) -> Flow:
+    
+    # Create user flow
+    user_flow = aflow.userflow()
+    user_flow.spec.display_name = "Example dynamic form"
+    
+    # Create form node
+    form_node = user_flow.form(
+        name="dynamic_form", 
+        display_name="Dynamic form example",
+        cancel_button_label="Cancel")
+    
+    #FIELD 1: Country
+    country_choices = DataMap()
+    country_choices.add(Assignment(
+        target_variable="self.input.choices",
+        value_expression="flow.input.countries"
+    ))
+    
+    country_default = DataMap()
+    country_default.add(Assignment(
+        target_variable="self.input.default",
+        value_expression="flow.input.default_country"
+    ))
+    
+    form_node.single_choice_input_field(
+        name="country",
+        label="Country",
+        required=False,
+        choices=country_choices,
+        default=country_default,
+        show_as_dropdown=True,
+        placeholder_text="Select an option"
+    )
+    
+    #FIELD 2: Visibility Behaviour
+    # Controls city and url fields
+    form_node.visibility_behaviour_field(
+        name="visibility_behaviour",
+        on_change_to_field="country",
+        rules=[
+            RuleBuilder.visibility_rule(
+                field_name="country",
+                field_value="USA",
+                impacted_field="city",
+                visible_when_true=True,
+                operator="equals"
+            ),
+            RuleBuilder.visibility_rule(
+                field_name="country",
+                field_value="Canada",
+                impacted_field="url",
+                visible_when_true=True,
+                operator="equals"
+            )
+        ],
+        display_name="Visibility rule"
+    )
+    
+    # FIELD 3: Label Behaviour
+    # Controls code, region, and documents field labels
+    form_node.label_behaviour_field(
+        name="label_behaviour",
+        on_change_to_field="country",
+        rules=[
+            RuleBuilder.label_rule(
+                field_name="country",
+                field_value="USA",
+                impacted_field="code",
+                label_when_true="Zip code",
+                label_when_false="Postal code",
+                operator="equals"
+            ),
+            RuleBuilder.label_rule(
+                field_name="country",
+                field_value="USA",
+                impacted_field="region",
+                label_when_true="State",
+                label_when_false="Province",
+                operator="equals"
+            ),
+            RuleBuilder.label_rule(
+                field_name="country",
+                field_value="USA",
+                impacted_field="documents",
+                label_when_true="US W-2 Form",
+                label_when_false="Canadian T4 Form",
+                operator="equals"
+            )
+        ],
+        display_name="Label rule"
+    )
+    
+    # FIELD 4: Value-Source Behaviour
+    # Populates region field options from tool
+    form_node.value_source_behaviour_field(
+        name="value_source_behaviour",
+        on_change_to_field="country",
+        impacted_field="region",
+        tool_name="get_states_or_provinces",
+        tool_id="9f0ecb53-dbd9-4e41-be46-29c8d47d6df8",
+        field_mappings={
+            "country": "parent.field.country"
+        },
+        display_name="ProgSelect"
+    )
+    
+    # FIELD 5: Region
+    region_choices = DataMap()
+    region_choices.add(Assignment(
+        target_variable="self.input.choices",
+        value_expression='',
+        has_no_value=True
+    ))
+    region_choices.add(Assignment(
+        target_variable="self.input.display_text",
+        value_expression='',
+        has_no_value=True
+    ))
+    region_choices.add(Assignment(
+        target_variable="self.input.display_items",
+        value_expression='',
+        has_no_value=True
+    ))
+    
+    form_node.single_choice_input_field(
+        name="region",
+        label="Region",
+        required=False,
+        choices=region_choices,
+        show_as_dropdown=True,
+        placeholder_text="Select an option"
+    )
+    
+    # FIELD 6: Code
+    form_node.text_input_field(
+        name="code",
+        label="Code",
+        required=False
+    )
+    
+    # FIELD 7: City
+    form_node.text_input_field(
+        name="city",
+        label="City",
+        required=False
+    )
+    
+    # FIELD 8: Documents
+    form_node.file_upload_field(
+        name="documents",
+        label="Documents"
+    )
+    
+    # FIELD 9: URL
+    form_node.text_input_field(
+        name="url",
+        label="URL",
+        required=False
+    )
+    
+    # Add edges
+    user_flow.edge(START, form_node)
+    user_flow.edge(form_node, END)
+    
+    # Script to initialize input data
+    init_script = """
+# Initialize countries list
+flow.input.countries = ["USA", "Canada"]
+
+# Initialize US states
+flow.input.usa_states = ["California", "Texas", "New York", "Florida", "Illinois", "Pennsylvania"]
+
+# Initialize Canadian provinces
+flow.input.canada_provinces = ["Ontario", "Quebec", "British Columbia", "Alberta", "Manitoba", "Saskatchewan"]
+
+# Set default selections
+flow.input.default_country = "USA"
+flow.input.default_region = "California"
+"""
+    init_data = aflow.script(name="init_data", script=init_script)
+    
+    # Add user flow to main flow with initialization
+    aflow.sequence(START, init_data, user_flow, END)
+    
+    return aflow
+
+See all 227 lines
+Timer node
+Use a timer node to set a delay between actions in your agentic workflow.
+To configure a timer node, call the timer() method in your agentic workflow. This method accepts the following input arguments:
+​
+name
+stringrequired
+Unique identifier for the node.
+​
+delay
+integerrequired
+Timer delay in milliseconds.
+​
+display_name
+string
+Display name for the node.
+​
+description
+string
+Description of the node.
+​
+input_map
+DataMap
+Define input mappings using a structured collection of Assignment objects.
+The following example shows how to add a timer node to a loop:
+Python
+from pydantic import BaseModel, Field
+from ibm_watsonx_orchestrate.flow_builder.flows import END, Flow, flow, START
+from .get_facts_about_numbers import get_facts_about_numbers
+from .get_request_status import get_request_status
+
+class InputtedNumber(BaseModel):
+    number: int = Field(description="Inputted number from user")
+
+class Attempt(BaseModel):
+    atmp: int = Field(description="Represent each attemp to check if the request is finish", default=0)
+
+class FlowOutput(BaseModel):
+    info: str = Field(description="Fact about a number")
+
+@flow(
+    name="get_number_random_fact_flow",
+    input_schema=InputtedNumber,
+    output_schema=FlowOutput,
+    description="A flow to get a random fact about a number"
+)
+def get_number_random_fact_flow(aflow: Flow) -> Flow:
+    get_facts_about_numbers_node = aflow.tool(
+        get_facts_about_numbers,
+        input_schema=InputtedNumber,
+        output_schema=FlowOutput
+    )
+
+    while_loop: Flow = aflow.loop(
+        evaluator="not parent.get_request_status.input.attempt.atmp or parent.get_request_status.input.attempt.atmp < 5",
+        input_schema=Attempt,
+        output_schema=FlowOutput
+    )
+
+    timer_node = while_loop.timer(
+        name="wait_1_sec",
+        delay=1000,
+        description="Wait for 1 second before polling again"
+    )
+
+    get_request_status_node = while_loop.tool(get_request_status)
+    while_loop.sequence(START, get_request_status_node, timer_node, END)
+    aflow.sequence(START, get_facts_about_numbers_node, while_loop, END)
+
+    return aflow
+See all 44 lines

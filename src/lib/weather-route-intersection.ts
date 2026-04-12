@@ -60,6 +60,8 @@ export interface UsMapDisplay {
   viewBoxWidth: number;
   viewBoxHeight: number;
   landPathD: string;
+  /** Internal US state borders (projected), from Census topojson mesh */
+  stateBordersPathD?: string;
   /** Affected corridors only */
   routePaths: UsMapRoutePath[];
   markers: UsMapProjectedMarker[];
