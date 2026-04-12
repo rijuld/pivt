@@ -16,6 +16,39 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## IBM watsonx Orchestrate (ADK)
+
+Agent specs and Python tools live under [`adk/`](./adk/). Use **Python 3.11 or 3.12** for the `ibm-watsonx-orchestrate` CLI. Set `IBM_API_KEY` and `SERVICE_INSTANCE_URL` (see `.env.local`), start the app, then run:
+
+```bash
+cd adk && ./deploy.sh
+```
+
+Set `APP_BASE_URL` (default `http://127.0.0.1:3000`) so tools call the live Next.js APIs. If `deploy.sh` fails to authenticate, set `ORCHESTRATE_AUTH_TYPE` to `ibm_iam` or `mcsp` to match your instance (the CLI usually infers the correct type from the service URL).
+
+Set `REDIS_URL` (e.g. `redis://127.0.0.1:6379`) when importing **`redis_memory.py`** tools so Pivt agents can read/write shared agent memory. Start Redis with `docker compose up -d redis`.
+
+### Redis agent memory (MCP + Orchestrate)
+
+- **Cursor / MCP clients:** [`mcp/redis-agent-memory`](./mcp/redis-agent-memory/) — stdio MCP server (`memory_get`, `memory_set`, `memory_delete`, `memory_list_keys`, `memory_append_event`, `memory_list_events`). Build once: `cd mcp/redis-agent-memory && npm install && npm run build`. Project [`.cursor/mcp.json`](./.cursor/mcp.json) points at `dist/index.js` with `REDIS_URL` and optional `MEMORY_NAMESPACE` (default `eis`).
+- **watsonx Orchestrate:** Python tools in [`adk/tools/redis_memory.py`](./adk/tools/redis_memory.py) use the **same Redis key layout** as the MCP server. Re-run `adk/deploy.sh` after starting Redis.
+
+### Web search (Tavily)
+
+- **MCP:** [`mcp/tavily-web-search`](./mcp/tavily-web-search/) — tool `tavily_search` (POST `https://api.tavily.com/search` with `Authorization: Bearer <key>`). Build: `cd mcp/tavily-web-search && npm install && npm run build`. Set **`TAVILY_API_KEY`** in the environment (or Cursor MCP server env) before starting the server.
+- **Orchestrate (Python):** [`adk/tools/tavily_search.py`](./adk/tools/tavily_search.py) — same API; deploy with `adk/deploy.sh` and set `TAVILY_API_KEY` where tools run.
+
+### Importing MCP toolkits into watsonx Orchestrate
+
+Orchestrate can attach **Node** or **Python** MCP servers (often via `npx` / `uvx`) and imports them as a **toolkit**. Before import:
+
+1. Ensure **every tool has a description** (required for import).
+2. Put secrets in a **Connection** (App ID) as **key-value** pairs (e.g. `TAVILY_API_KEY`, `REDIS_URL`) so the process sees them at startup.
+3. Plan for **manual reimport** if tool lists change (no automatic refresh).
+4. Unsupported: OAuth 2.1 / DCR, Docker image import, resources/prompts import, cancelling mid-execution, elicitation/annotation on tools.
+
+Use **ADK “Managing toolkits”** or the Orchestrate UI **Import tools from an MCP server** to register the stdio servers above.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

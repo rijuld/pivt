@@ -6,18 +6,36 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate:world-path": "node scripts/generate-world-land-path.mjs"
   },
   "dependencies": {
+    "@mapbox/polyline": "^1.2.1",
+    "@react-google-maps/api": "^2.20.8",
+    "@turf/turf": "^7.3.4",
+    "better-sqlite3": "^12.8.0",
+    "d3-geo": "^3.1.1",
+    "framer-motion": "^12.38.0",
+    "mapbox-gl": "^3.21.0",
     "next": "16.2.3",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-map-gl": "^8.1.1",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/d3-geo": "^3.1.0",
+    "@types/google.maps": "^3.58.1",
+    "@types/mapbox__polyline": "^1.0.5",
+    "@types/mapbox-gl": "^3.4.1",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/topojson-client": "^3.1.5",
+    "@types/topojson-specification": "^1.0.5",
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
     "tailwindcss": "^4",

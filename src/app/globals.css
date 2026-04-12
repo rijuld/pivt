@@ -1,26 +1,104 @@
 @import "tailwindcss";
 
+/* ─── Argentum-Inspired-UI design tokens ─── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #000000;
+  --foreground: #ffffff;
+  --muted: #a3a3a3;
+  --text-tertiary: #666666;
+  --accent: #d8f966;
+  --accent-foreground: #000000;
+  --surface: #000000;
+  --surface-elevated: #111111;
+  --surface-card: #1a1a1a;
+  --surface-light: #ebebeb;
+  --border: #333333;
+  --border-light: #ffffff;
+  --success: #d8f966;
+  --warn: #fbbf24;
+  --danger: #ef4444;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-geist-sans), system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    sans-serif;
+}
+
+/* ─── animations ─── */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(163, 163, 163, 0.06) 25%,
+    rgba(163, 163, 163, 0.12) 50%,
+    rgba(163, 163, 163, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  70% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+}
+.pulse-ring {
+  animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-slide-up {
+  animation: slide-up 0.4s ease-out forwards;
+}
+
+/* ─── scrollbar ─── */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(163, 163, 163, 0.15);
+  border-radius: 0;
+}
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(163, 163, 163, 0.15) transparent;
 }

@@ -1,0 +1,12 @@
+# Local Redis for EIS agent memory (MCP server + watsonx redis_memory_* tools).
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - eis_redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+
+volumes:
+  eis_redis_data:

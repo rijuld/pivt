@@ -1,0 +1,4 @@
+# Install with Python 3.11 or 3.12. Pin ADK to avoid pip backtracking to an old orchestrate when adding redis.
+requests>=2.31.0,<3
+ibm-watsonx-orchestrate==2.7.0
+redis>=5.0.0,<7

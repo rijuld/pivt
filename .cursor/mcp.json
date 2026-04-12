@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "eis-redis-agent-memory": {
+      "command": "node",
+      "args": ["${workspaceFolder}/mcp/redis-agent-memory/dist/index.js"],
+      "env": {
+        "REDIS_URL": "redis://127.0.0.1:6379",
+        "MEMORY_NAMESPACE": "eis"
+      }
+    },
+    "eis-tavily-web-search": {
+      "command": "node",
+      "args": ["${workspaceFolder}/mcp/tavily-web-search/dist/index.js"]
+    }
+  }
+}
