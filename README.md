@@ -2,7 +2,7 @@
   <img src="./public/pivt-logo.png" alt="Pivt" width="140" />
 </p>
 
-# Pivt — Exception Intelligence War Room
+# Pivt — Truck Rerouting Agents
 
 Pivt is a logistics **exception intelligence system (EIS)**: a Next.js "War Room" that watches a
 live fleet, detects when a shipment is about to break (severe weather, port action, long delay),
